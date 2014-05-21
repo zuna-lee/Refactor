@@ -6,14 +6,15 @@ import java.util.Hashtable;
 import zuna.model.Element;
 import zuna.model.MyClass;
 import zuna.refactoring.ProjectAnalyzer;
+import zuna.util.KeyMaker;
 
 public class ArchitectureBasedDS extends ICBasedDS{
 
 	public static Hashtable<String, Double> dsTable = new Hashtable<String, Double>();
-	public static double max = -1;
 	
 	public ArchitectureBasedDS(){
-		if(max == -1) this.getTable();
+		dsTable.clear();
+		this.getTable();
 	}
 	
 	private double getDistance(MyClass c1, MyClass c2){
@@ -32,7 +33,7 @@ public class ArchitectureBasedDS extends ICBasedDS{
 	@Override
 	public double DS(MyClass c1, MyClass c2) {
 		if(c1.getID().equals(c2.getID())) return 1.0;
-		else return dsTable.get(super.getKey(c1, c2));//super.normalization(getDistance(c1, c2));
+		else return dsTable.get(KeyMaker.getKey(c1, c2));//super.normalization(getDistance(c1, c2));
 	}
 	
 	private int getSize(){
@@ -65,10 +66,10 @@ public class ArchitectureBasedDS extends ICBasedDS{
 					MyClass c2 = ProjectAnalyzer.project.getClass(key2);
 					
 					if(c1!=null && c2!=null// & !c1.isInterface() && !c2.isInterface()
-							&& !dsTable.containsKey(super.getKey(c1, c2))){
+							&& !dsTable.containsKey(KeyMaker.getKey(c1, c2))){
 						double ds = this.getDistance(c1, c2);
-						ArchitectureBasedDS.dsTable.put(super.getKey(c1, c2), ds);
-						ArchitectureBasedDS.dsTable.put(super.getKey(c2, c1), ds);
+						ArchitectureBasedDS.dsTable.put(KeyMaker.getKey(c1, c2), ds);
+						ArchitectureBasedDS.dsTable.put(KeyMaker.getKey(c2, c1), ds);
 						data.add(ds);
 						sum+=ds;
 						cnt++;
@@ -80,7 +81,6 @@ public class ArchitectureBasedDS extends ICBasedDS{
 		
 		double avg = sum/(double) cnt;
 		double sdv = this.getStdev(data, avg);
-		max = 1;
 		dsTable = super.normalization(dsTable, avg, sdv);
 	}
 

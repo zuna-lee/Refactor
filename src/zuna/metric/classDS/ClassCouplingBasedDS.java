@@ -7,6 +7,7 @@ import zuna.model.MyClass;
 import zuna.model.MyField;
 import zuna.model.MyMethod;
 import zuna.refactoring.ProjectAnalyzer;
+import zuna.util.KeyMaker;
 
 public class ClassCouplingBasedDS  extends DS{
 
@@ -58,10 +59,10 @@ public class ClassCouplingBasedDS  extends DS{
 					MyClass c2 = ProjectAnalyzer.project.getClass(key2);
 					
 					if(c1!=null && c2!=null// & !c1.isInterface() && !c2.isInterface()
-							&& !dsTable.containsKey(super.getKey(c1, c2))){
+							&& !dsTable.containsKey(KeyMaker.getKey(c1, c2))){
 						double ds = this.getDistance(c1, c2);
-						dsTable.put(super.getKey(c1, c2), ds);
-						dsTable.put(super.getKey(c2, c1), ds);
+						dsTable.put(KeyMaker.getKey(c1, c2), ds);
+						dsTable.put(KeyMaker.getKey(c2, c1), ds);
 						data.add(ds);
 						sum+=ds;
 						cnt++;
@@ -80,7 +81,7 @@ public class ClassCouplingBasedDS  extends DS{
 	@Override
 	public double DS(MyClass c1, MyClass c2) {
 		if(c1.getID().equals(c2.getID())) return 1.0;
-		else return dsTable.get(super.getKey(c1, c2));//super.normalization(getDistance(c1, c2));
+		else return dsTable.get(KeyMaker.getKey(c1, c2));//super.normalization(getDistance(c1, c2));
 	}
 
 	private double tot(MyClass c1, MyClass c2){

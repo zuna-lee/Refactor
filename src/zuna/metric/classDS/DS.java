@@ -48,11 +48,7 @@ public abstract class DS {
 		}
 		return dsTable;
 	}
-	
-	protected String getKey(MyClass c1, MyClass c2){
-		return c1.getID() + ":" + c2.getID();
-	}
-	
+
 	protected double getStdev(ArrayList<Double> data, double avg) {
 		double ss = 0.0;
 		
