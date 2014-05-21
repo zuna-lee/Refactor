@@ -17,6 +17,10 @@ public abstract class Element implements Serializable{
 	private double se;
 	private double ic;
 	
+	public void setID(String iD) {
+		ID = iD;
+	}
+	
 	public double getSe() {
 		return se;
 	}

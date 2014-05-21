@@ -1,6 +1,7 @@
 package zuna.model;
 
-import java.io.Serializable;
+
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
@@ -72,6 +73,7 @@ import org.eclipse.jdt.core.dom.SynchronizedStatement;
 import org.eclipse.jdt.core.dom.ThisExpression;
 import org.eclipse.jdt.core.dom.ThrowStatement;
 import org.eclipse.jdt.core.dom.TryStatement;
+import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.TypeDeclarationStatement;
 import org.eclipse.jdt.core.dom.TypeLiteral;
@@ -80,18 +82,19 @@ import org.eclipse.jdt.core.dom.VariableDeclarationExpression;
 import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
 import org.eclipse.jdt.core.dom.WhileStatement;
 
+import zuna.metric.classDS.InformationContents;
+import zuna.metric.classDS.InheritanceBasedDS;
 import zuna.parser.visitor.MethodVisitor;
 
-public class Repo  implements Serializable {
 
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = -5012298760929784285L;
+public class Repo {
+
 	private String name;
 	private static String tmpPackageName;
 	private  HashMap<String, MyPackage> packageList = new HashMap<String, MyPackage>();
-	private  HashMap<String, MyClass> classList = new HashMap<String, MyClass>();
+	private  HashMap<String, MyClass> classList = new HashMap<String, MyClass>();  
+	private HashMap<String, String> classesInSystem = new HashMap<String, String>();
+	
 	private  HashMap<String, MyMethod> methodList = new HashMap<String, MyMethod>();
 	private  HashMap<String, MyField> fieldList = new HashMap<String, MyField>();
 	private  HashMap<String, MyParameter> parameterList = new HashMap<String, MyParameter>();
@@ -104,7 +107,17 @@ public class Repo  implements Serializable {
 		init();
 		this.name = name;
 	}
-		
+	
+	
+	public HashMap<String, String> getClassesInSystem() {
+		return classesInSystem;
+	}
+
+
+	public void addClassesInSystem(String key){
+		this.classesInSystem.put(key, key);
+	}
+	
 	public void setPackageList(HashMap<String, MyPackage> packageList) {
 		this.packageList = packageList;
 	}
@@ -180,11 +193,9 @@ public class Repo  implements Serializable {
 		return newClass;
 	}
 		
-	@SuppressWarnings("unchecked")
 	public MyMethod createMethod(MethodDeclaration md, MyClass parent) {
 		
 		IMethodBinding methodBinding = md.resolveBinding();
-		methodBinding.overrides(methodBinding);
 		
 		List<SingleVariableDeclaration> singleVariableDeclarations = md.parameters();
 		
@@ -199,19 +210,32 @@ public class Repo  implements Serializable {
 			
 			if(md.getBody() == null) {
 				
+				newMethod.setAbstract(true);
 				newMethod.setStatementCnt(0);
 				
 			} else {
+				newMethod.setConstructor(md.isConstructor());
+				
+				newMethod.setPublic(Modifier.isPublic(md.getModifiers()));
+				newMethod.setPublic(Modifier.isPrivate(md.getModifiers()));
+				newMethod.setPublic(Modifier.isProtected(md.getModifiers()));
+				
+				newMethod.setStatic(Modifier.isStatic(md.getModifiers()));
+				
+				newMethod.setAbstract(Modifier.isAbstract(md.getModifiers()));
 				newMethod.setStatementCnt(md.getBody().statements().size());
 				
 				Block body = md.getBody();
+				
 				List<Statement> statements = body.statements();
+				
 				for (Statement statement : statements) {
 					extractIdentifier(identifiers, statement);
 				}
 			}
 			
 			MyIdentifier myIdentifier = new MyIdentifier();
+			
 			myIdentifier.setIdentifiers(identifiers);
 			
 			newMethod.setIdentifier(myIdentifier);
@@ -221,13 +245,11 @@ public class Repo  implements Serializable {
 			newMethod.setParameters(parameters);
 			
 			for (MyParameter myParameter : parameters) {
+			
 				parameterList.put(myParameter.getName(), myParameter);
 			}
 			
 			newMethod = this.setModifiers(md, newMethod, md.modifiers().iterator());
-			
-			newMethod.setOverride(md.resolveBinding(), md.resolveBinding().getDeclaringClass());
-			newMethod.setCallToParent(md);
 			methodList.put(methodFullName, newMethod);
 		}
 		
@@ -861,6 +883,8 @@ public class Repo  implements Serializable {
 
 
 	public void init() {
+		InformationContents.maxIC = 0.0;
+		InheritanceBasedDS.max = -1;
 		packageList.clear();
 		classList.clear();
 		methodList.clear();
@@ -873,7 +897,8 @@ public class Repo  implements Serializable {
 	
 	public void makeClassNode(MyPackage pack, TypeDeclaration typeDeclaration, 
 			CompilationUnit cu, IPackageFragment mypackage) throws JavaModelException, Exception {
-
+		
+		
 		MyClass classChild;
 		MyMethod method;
 		classChild = createClass(typeDeclaration, cu, pack);
@@ -900,7 +925,7 @@ public class Repo  implements Serializable {
 
 
 	public ArrayList<MyMethod> makeFanOutList(Repo repo, MyMethod method, MethodDeclaration md) {
-		final Hashtable<String, MethodInvocation> methods = new Hashtable<String, MethodInvocation>();
+		final ArrayList<MethodInvocation> methods = new ArrayList<MethodInvocation>();
 		final ArrayList<ClassInstanceCreation> objectCreation = new ArrayList<ClassInstanceCreation>();
 		final Hashtable<String, SimpleName> reference = new Hashtable<String, SimpleName>();
 		
@@ -910,25 +935,13 @@ public class Repo  implements Serializable {
 			
 			@Override
 			public boolean visit(MethodInvocation invo){
-				if(!methods.containsKey(invo.resolveMethodBinding().getKey())){
-					methods.put(invo.resolveMethodBinding().getKey(),invo);
-				}
-				
+				methods.add(invo);
 				return true;
 			}
 			
 			@Override
 			public boolean visit(SimpleName ref){
-				
-				if(ref.getParent() instanceof MethodInvocation){
-					MethodInvocation inv = (MethodInvocation)ref.getParent();
-					if(!methods.containsKey(inv.resolveMethodBinding().getKey())){
-						methods.put(inv.resolveMethodBinding().getKey(),inv);
-					}
-				}
-				
 				reference.put(ref.getFullyQualifiedName(), ref);
-				
 				return true;
 			}
 			
@@ -985,21 +998,19 @@ public class Repo  implements Serializable {
 			
 		}
 		
-		for (String key : methods.keySet()) {
-			MethodInvocation mdi = methods.get(key);
+		for (MethodInvocation mdi : methods) {
 			try {
 				MyMethod m = methodList.get(MyMethod.makeMethodFullName(mdi.resolveMethodBinding()));
 				
 				if(m!=null) {
 					method.addFanOutMethod(m);
-					
+					method.getParent().addUsesClasses(m.getParent());
+				}else{
+					MyMethod addm = makeLibHierarchy(mdi);
+					method.addFanOutMethod(addm);
+					method.getParent().addUsesClasses(addm.getParent());
+					add.add(addm);
 				}
-//				else{
-//					MyMethod addm = makeLibHierarchy(mdi);
-//					method.addFanOutMethod(addm);
-//					
-//					add.add(addm);
-//				}
 				
 			} catch (NullPointerException | java.lang.NoSuchMethodError e) {
 				System.out.println(mdi.getName());
@@ -1013,6 +1024,7 @@ public class Repo  implements Serializable {
 			
 			if(constructor!=null){
 				method.addFanOutMethod(constructor);
+				method.getParent().addUsesClasses(constructor.getParent());
 			}
 		}
 		
@@ -1030,7 +1042,6 @@ public class Repo  implements Serializable {
 		ITypeBinding itb = inv.resolveMethodBinding().getDeclaringClass();
 		IPackageBinding ipb = itb.getPackage();
 		String methodName = getFullName(inv);
-		String name = inv.getName().getIdentifier();
 		
 		MyMethod m = methodList.get(methodName);
 		MyPackage p = packageList.get(ipb.getName());
@@ -1048,7 +1059,7 @@ public class Repo  implements Serializable {
 		}
 		
 		if(m==null){
-			m = new MyMethod(c.getID() + "." + methodName, name, true);
+			m = new MyMethod(c.getID() + "." + methodName, true);
 		}
 		
 		m.setParent(c);

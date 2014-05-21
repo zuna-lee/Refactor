@@ -1,6 +1,6 @@
 package zuna.model;
 
-import java.io.Serializable;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -14,52 +14,137 @@ import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.SimpleName;
 
 
-public class MyMethod extends Element implements Cloneable, Serializable {
+public class MyMethod extends Element implements Cloneable {
 
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = -6871156752143359642L;
 	private boolean support;
 	private MyClass parent;
-	private String name;
 	private ArrayList<MyMethod> fanOut = new ArrayList<MyMethod>();
 	private ArrayList<MyMethod> fanIn = new ArrayList<MyMethod>();
 	private ArrayList<MyParameter> parameters = new ArrayList<MyParameter>();
 	private MyIdentifier identifier = new MyIdentifier();
-	private Hashtable<String, ITypeBinding> superTypes = new Hashtable<String, ITypeBinding>();
-	
+	private boolean Abstract = false;
 	private int statementCnt = 0;
-	private boolean override=false;
-	private boolean isStatic;
-	private boolean callToParent = false;
+	private boolean override;
+	private boolean constructor=false;
+	private boolean Implemented = true;
+	private boolean Public;
+	private boolean Private;
+	private boolean Protected;
+	private boolean Static = true;
 	private ArrayList<MyField> reffedField = new ArrayList<MyField>();
 	private int noOfParams = 0;
 	private MethodDeclaration md;
+	private boolean callToParent;
+	private Hashtable<String, ITypeBinding> superTypes = new Hashtable<String, ITypeBinding>();
+	private String name;
 	
 	public boolean isCallToParent() {
 		return callToParent;
 	}
+	
+	public void setOverride(IMethodBinding methodBind, ITypeBinding typeBind) {
+	     /* get super class */
+	     ITypeBinding superTypeBind = typeBind.getSuperclass();
+	     if(superTypeBind == null)
+	          return;
 
-	public boolean isStatic() {
-		return isStatic;
+	     IMethodBinding overridenMethodBind = null;
+	     if((overridenMethodBind = matchMethodInType(methodBind, superTypeBind)) == null)
+	          setOverride(methodBind, superTypeBind);
+	     else{
+	    	 override = true;
+//	    	 System.out.println(methodBind.getKey() + " Overrides " + overridenMethodBind.getKey());
+	     }
+	     
+	     if(!override){
+	    	 /* search in super interfaces also */
+		     ITypeBinding[] interfaceBinds = typeBind.getInterfaces();
+		     for(ITypeBinding interfaceBind : interfaceBinds) {   
+		          if((overridenMethodBind = matchMethodInType(methodBind, interfaceBind)) == null)
+		               setOverride(methodBind, superTypeBind);
+		          else{
+		        	  override = true;
+//		        	  System.out.println(methodBind.getKey() + " Overrides " + overridenMethodBind.getKey());
+		          }
+		              
+		     } 
+	     }
 	}
-
-
-	public void setStatic(boolean isStatic) {
-		this.isStatic = isStatic;
+	
+	/* now matching the method signature with methods inside the type binding
+	 * using erasure of type bind it should work for generic methods as well */ 
+	private IMethodBinding matchMethodInType(IMethodBinding methodBind, ITypeBinding typeBind) {
+	 
+	     /* iterate though all the methods within type bind */
+	     for(IMethodBinding tMethodBind : typeBind.getDeclaredMethods()) {
+	          if(!tMethodBind.getName().equals(methodBind.getName()))
+	               continue;
+	          if(tMethodBind.getParameterTypes().length != methodBind.getParameterTypes().length)
+	               continue;
+	 
+	          ITypeBinding[] params1 = tMethodBind.getParameterTypes();
+	          ITypeBinding[] param2 = methodBind.getParameterTypes();
+	          
+	          /* matching erasures instead of raw types */
+	          for(int i = 0; i < params1.length; i++) {
+	               if(params1[i].getErasure().equals(param2[i].getErasure()))
+	                    continue;
+	          }
+	          return tMethodBind;
+	     }
+	     return null;
 	}
-
-
-	public void setMd(MethodDeclaration md) {
-		this.md = md;
+	
+	
+	public void setCallToParent(MethodDeclaration md) {
+		ITypeBinding typeBinding = md.resolveBinding().getDeclaringClass();
+		getParentTypes(typeBinding);
+		
+		md.accept(new ASTVisitor(){
+			public boolean visit(MethodInvocation inv){
+				if(inv.resolveMethodBinding().getDeclaringClass() != null){
+					ITypeBinding usedType = inv.resolveMethodBinding().getDeclaringClass();
+					if(superTypes.containsKey(usedType.getKey())){
+						callToParent = true;
+					}
+				}
+				
+				return true;
+			}
+			
+			public boolean visit(SimpleName inv){
+				if(inv.getParent() instanceof MethodInvocation){
+					MethodInvocation methodInv = (MethodInvocation)inv.getParent();
+					ITypeBinding usedType = methodInv.resolveMethodBinding().getDeclaringClass();
+					if(superTypes.containsKey(usedType.getKey())){
+						callToParent = true;
+					}
+				}
+				
+				return true;
+			}
+			
+		});
 	}
-
+	
+	private void getParentTypes(ITypeBinding binding){
+		ITypeBinding superType = binding.getSuperclass();
+		if(superType!=null){
+			superTypes.put(superType.getKey(), superType);
+			this.getParentTypes(superType);	
+		}
+	}
+	
+	public boolean isPublic() {
+		return Public;
+	}
 
 	public Object clone() throws CloneNotSupportedException {
+		
 		MyMethod clone = (MyMethod) super.clone();
 		clone.parameters = (ArrayList<MyParameter>) parameters.clone();
 		clone.statementCnt = statementCnt;
+		clone.constructor = (boolean) constructor;
 		clone.support = (boolean) support;
 		return clone;
 	}
@@ -73,8 +158,40 @@ public class MyMethod extends Element implements Cloneable, Serializable {
 	}
 
 
+	public void setPublic(boolean public1) {
+		Public = public1;
+	}
+
+	public boolean isPrivate() {
+		return Private;
+	}
+
+	public void setPrivate(boolean private1) {
+		Private = private1;
+	}
+
+	public boolean isProtected() {
+		return Protected;
+	}
+
+	public void setProtected(boolean protected1) {
+		Protected = protected1;
+	}
+
 	public int getStatementCnt() {
 		return statementCnt;
+	}
+
+	public boolean isStatic() {
+		return Static;
+	}
+
+	public void setStatic(boolean static1) {
+		Static = static1;
+	}
+
+	public boolean isAbstract() {
+		return Abstract;
 	}
 
 
@@ -82,6 +199,20 @@ public class MyMethod extends Element implements Cloneable, Serializable {
 	public boolean isOverride() {
 		return override;
 	}
+
+
+
+	public boolean isConstructor() {
+		return constructor;
+	}
+
+
+
+	public boolean isImplemented() {
+		return Implemented;
+	}
+
+
 
 
 
@@ -110,10 +241,6 @@ public class MyMethod extends Element implements Cloneable, Serializable {
 	}
 
 
-
-	public String getName() {
-		return name;
-	}
 
 	public ArrayList<MyMethod> getFanIn() {
 		return fanIn;
@@ -187,8 +314,20 @@ public class MyMethod extends Element implements Cloneable, Serializable {
 		return identifier.toString();
 	}
 	
+	public void setAbstract(boolean abstract1) {
+		Abstract = abstract1;
+	}
+
 	public void setOverride(boolean override) {
 		this.override = override;
+	}
+
+	public void setConstructor(boolean constructor) {
+		this.constructor = constructor;
+	}
+
+	public void setImplemented(boolean implemented) {
+		Implemented = implemented;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -210,15 +349,12 @@ public class MyMethod extends Element implements Cloneable, Serializable {
 		this.name = name;
 	}
 	
-	public void addParameter(String type, String identifier){
-		for(MyParameter param: this.parameters){
-			if(param.getName().equals(identifier)){
-				return;
-			}
-		}
-		MyParameter newParam = new MyParameter(this, type, identifier);
-		this.parameters.add(newParam);
+	public MyMethod(String id, boolean lib) {
+		super(id, lib);
 	}
+	
+
+	
 	
 	public MethodDeclaration getMd() {
 		return md;
@@ -340,98 +476,5 @@ public class MyMethod extends Element implements Cloneable, Serializable {
 
 	public ArrayList<MyField> getReferencedField() {
 		return this.reffedField ;
-	}
-	
-
-	public void setCallToParent(MethodDeclaration md) {
-		ITypeBinding typeBinding = md.resolveBinding().getDeclaringClass();
-		getParentTypes(typeBinding);
-		
-		md.accept(new ASTVisitor(){
-			public boolean visit(MethodInvocation inv){
-				if(inv.resolveMethodBinding().getDeclaringClass() != null){
-					ITypeBinding usedType = inv.resolveMethodBinding().getDeclaringClass();
-					if(superTypes.containsKey(usedType.getKey())){
-						callToParent = true;
-					}
-				}
-				
-				return true;
-			}
-			
-			public boolean visit(SimpleName inv){
-				if(inv.getParent() instanceof MethodInvocation){
-					MethodInvocation methodInv = (MethodInvocation)inv.getParent();
-					ITypeBinding usedType = methodInv.resolveMethodBinding().getDeclaringClass();
-					if(superTypes.containsKey(usedType.getKey())){
-						callToParent = true;
-					}
-				}
-				
-				return true;
-			}
-			
-		});
-	}
-	
-	private void getParentTypes(ITypeBinding binding){
-		ITypeBinding superType = binding.getSuperclass();
-		if(superType!=null){
-			superTypes.put(superType.getKey(), superType);
-			this.getParentTypes(superType);	
-		}
-	}
-	
-	public void setOverride(IMethodBinding methodBind, ITypeBinding typeBind) {
-	     /* get super class */
-	     ITypeBinding superTypeBind = typeBind.getSuperclass();
-	     if(superTypeBind == null)
-	          return;
-
-	     IMethodBinding overridenMethodBind = null;
-	     if((overridenMethodBind = matchMethodInType(methodBind, superTypeBind)) == null)
-	          setOverride(methodBind, superTypeBind);
-	     else{
-	    	 override = true;
-//	    	 System.out.println(methodBind.getKey() + " Overrides " + overridenMethodBind.getKey());
-	     }
-	     
-	     if(!override){
-	    	 /* search in super interfaces also */
-		     ITypeBinding[] interfaceBinds = typeBind.getInterfaces();
-		     for(ITypeBinding interfaceBind : interfaceBinds) {   
-		          if((overridenMethodBind = matchMethodInType(methodBind, interfaceBind)) == null)
-		               setOverride(methodBind, superTypeBind);
-		          else{
-		        	  override = true;
-//		        	  System.out.println(methodBind.getKey() + " Overrides " + overridenMethodBind.getKey());
-		          }
-		              
-		     } 
-	     }
-	}
-	
-	/* now matching the method signature with methods inside the type binding
-	 * using erasure of type bind it should work for generic methods as well */ 
-	private IMethodBinding matchMethodInType(IMethodBinding methodBind, ITypeBinding typeBind) {
-	 
-	     /* iterate though all the methods within type bind */
-	     for(IMethodBinding tMethodBind : typeBind.getDeclaredMethods()) {
-	          if(!tMethodBind.getName().equals(methodBind.getName()))
-	               continue;
-	          if(tMethodBind.getParameterTypes().length != methodBind.getParameterTypes().length)
-	               continue;
-	 
-	          ITypeBinding[] params1 = tMethodBind.getParameterTypes();
-	          ITypeBinding[] param2 = methodBind.getParameterTypes();
-	          
-	          /* matching erasures instead of raw types */
-	          for(int i = 0; i < params1.length; i++) {
-	               if(params1[i].getErasure().equals(param2[i].getErasure()))
-	                    continue;
-	          }
-	          return tMethodBind;
-	     }
-	     return null;
 	}
 }

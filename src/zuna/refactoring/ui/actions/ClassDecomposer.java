@@ -1,11 +1,9 @@
 package zuna.refactoring.ui.actions;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.IAdaptable;
-import org.eclipse.jdt.internal.core.CompilationUnit;
 import org.eclipse.jface.action.IAction;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
@@ -13,9 +11,9 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.IWorkbenchWindowActionDelegate;
 import org.eclipse.ui.PlatformUI;
 
-import zuna.model.MyClass;
+import zuna.metric.cohesion.FCM_Distance;
 import zuna.refactoring.ProjectAnalyzer;
-import zuna.util.Logger2File;
+import zuna.refactoring.operator.MutationClassIdentifier;
 
 @SuppressWarnings("restriction")
 public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
@@ -51,40 +49,35 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
         		init();
 	            IProject project = (IProject)((IAdaptable)firstElement).getAdapter(IProject.class);
 	            ProjectAnalyzer.firstElement = (IAdaptable)firstElement;
+	            
 	            ProjectAnalyzer.analyze(project);
 	            
-	            System.out.println(ProjectAnalyzer.project.getClassList().size());
-	            System.out.println(ProjectAnalyzer.project.getMethodList().size());
-	            System.out.println(ProjectAnalyzer.project.getPackageList().size());
 	            
-	            HashMap<String, MyClass> classList = ProjectAnalyzer.project.getClassList();
-	            int cnt = 0;
-	            int tot = 0;
-	            ArrayList<String> info = new ArrayList<String>();
+	            ArrayList<String> cc = new ArrayList<String>();
+	            cc.add("org.jhotdraw.draw.AbstractConnector");
+	            cc.add("org.jhotdraw.geom.Geom");
 	            
-	            for(String key: classList.keySet()){
-	            	MyClass c = classList.get(key);
-	            	
-	            	String id =c.getID();
-	            	String fsize = String.valueOf(c.getOwendField().size());
-	            	String msize = String.valueOf(c.getOwnedMethods().size());
-	            	String intf = String.valueOf(c.isInterface());
-	            	String abstrct = String.valueOf(c.isAbstract());
-	            	String enm = String.valueOf(c.isEnumuration());
-	            	
-	            	String v = id + ":" + fsize + ":" + msize + ":" + intf + ":" + abstrct + ":" + enm;
-	            	info.add(v);
-	            	if(!c.isInterface()){
-	            		tot++;
-	            		if(c.getOwendField().size()==0){
-	            			
-	            			cnt++;
-	            		}
-	            	}
-	            }
-	            Logger2File.print2CSVFile(info, "agv034");
+	            MutationClassIdentifier mutation = new MutationClassIdentifier();
+	            mutation.prepareExperiment(cc);
+	            mutation.doExperiment(new FCM_Distance(ProjectAnalyzer.project));
 	            
-	            System.out.println(cnt + ":" + tot + ":" + (double) cnt / (double) tot);
+//	            for(String key: ProjectAnalyzer.project.getClassList().keySet()){
+//	            	MyClass c= ProjectAnalyzer.project.getClassList().get(key);
+//	            	System.out.println(c.getID());
+//	            	ArrayList<MyMethod> methods = c.getOwnedMethods();
+//	            	
+//	            	for(MyMethod m: methods){
+//	            		if(m.getFanOut().size()>1){
+//	            			if(m.getFanOut().get(0).getParent().getID().startsWith("org.") && !m.getFanOut().get(0).getParent().getID().equals(c.getID())
+//	            					&& !m.getFanOut().get(0).getParent().isInterface()){
+//	            				System.out.println(m.getFanOut().get(0).getParent().getID() + ":"
+//	            						+ m.getFanOut().get(0).getParent().isLibrary());
+//		            			return;
+//	            			}
+//	            			
+//	            		}
+//	            	}
+//	            }
 	            
 			}catch(java.lang.NullPointerException e){
 				e.printStackTrace();
@@ -102,12 +95,6 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	}
     
     
-	private String getClassID(CompilationUnit cu) {
-		String classID = cu.getPath().toString().replace(cu.getPackageFragmentRoot().getPath().toString() + "/", "");
-		classID = classID.replace("/", ".");
-		classID = classID.substring(0, classID.length()-5);
-		return classID;
-	}
 	
 	
 	/**
