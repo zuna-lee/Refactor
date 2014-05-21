@@ -1,0 +1,16 @@
+package zuna.mining.hac.worldpeace;
+
+import zuna.mining.hac.experiment.DissimilarityMeasure;
+import zuna.mining.hac.experiment.Experiment;
+
+public class MyDissimilarityMeasure implements DissimilarityMeasure {
+
+	public double computeDissimilarity(Experiment experiment, int observation1, int observation2) {
+		
+		MyExperiment myExperiment = (MyExperiment) experiment;
+		
+		double d = 1 - myExperiment.getSimilarity(observation1, observation2);
+		
+		return d;
+	}
+}

@@ -1,0 +1,177 @@
+package zuna.refactoring.ui.operator;
+
+import java.util.Iterator;
+
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTParser;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
+import org.eclipse.jdt.internal.corext.refactoring.structure.ASTNodeSearchUtil;
+import org.eclipse.jface.text.BadLocationException;
+import org.eclipse.jface.text.Document;
+import org.eclipse.text.edits.MalformedTreeException;
+import org.eclipse.text.edits.TextEdit;
+
+import zuna.model.MyClass;
+import zuna.model.MyMethod;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.ui.views.classDecomposesrViews.graph.ExtractionHelper;
+
+@SuppressWarnings("restriction")
+public class Rewrite {
+ 	protected ICompilationUnit unit;
+ 	protected ASTRewrite rewriter;
+ 	protected CompilationUnit cu;
+ 	protected MethodDeclaration md;
+ 	protected AST astTarget;
+	protected IMethod method;
+	
+	protected Rewrite(IMethod oldMethod){
+		try {
+			this.method = oldMethod;
+			String fileName = oldMethod.getDeclaringType().getTypeRoot().findPrimaryType().getElementName() + ".java";
+			IPackageFragment package1 = oldMethod.getDeclaringType().getPackageFragment();
+			unit = package1.getCompilationUnit(fileName);
+			cu = parse(unit);
+			astTarget = cu.getAST();
+			rewriter = ASTRewrite.create(astTarget);
+			this.md = setMethodDeclaration(oldMethod.getDeclaringType(), oldMethod);
+		} catch (JavaModelException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	@SuppressWarnings("rawtypes")
+	protected Rewrite(MyMethod oldMethod){
+
+		try {
+			String fileName = ExtractionHelper.getFileName(oldMethod.getParent());
+			IPackageFragment[] packages;
+			packages = JavaCore.create(ProjectAnalyzer.iproject).getPackageFragments();
+			IPackageFragment package1 = getPackageFragment(oldMethod, packages);
+			
+			unit = package1.getCompilationUnit(fileName);
+			cu = parse(unit); 
+			astTarget = cu.getAST();
+			rewriter = ASTRewrite.create(astTarget);
+			Iterator iter = cu.types().iterator();
+			setMethodDeclaration(oldMethod, iter);
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	protected MethodDeclaration getMethodDecl(IMethod method) throws JavaModelException{
+		IType declaringType = method.getDeclaringType().getTypeRoot().findPrimaryType();
+		CompilationUnit cu = ExtractionHelper.parse(declaringType.getCompilationUnit());
+		return ASTNodeSearchUtil.getMethodDeclarationNode(method, cu);
+	}
+	
+	private IPackageFragment getPackageFragment(MyMethod oldMethod, IPackageFragment[] packages) {
+		
+		IPackageFragment package1 = null;
+		for (IPackageFragment mypackage : packages) {
+			if(mypackage.getElementName().equals(oldMethod.getParent().getParent().getID())){
+				package1 = mypackage;
+				break;
+			}
+		}
+		return package1;
+		
+	}
+
+ 	protected void save() {
+		try {
+			TextEdit edits = rewriter.rewriteAST();
+			Document document = new Document(unit.getSource());
+			edits.apply(document);
+			// this is the code for adding statements
+			unit.getBuffer().setContents(document.get());
+			unit.commitWorkingCopy(false, null);
+		} catch (JavaModelException | MalformedTreeException | BadLocationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+ 	
+	private MethodDeclaration setMethodDeclaration(IType type, IMethod method) throws JavaModelException {
+			CompilationUnit cu = ExtractionHelper.parse(type.getCompilationUnit());
+			return ASTNodeSearchUtil.getMethodDeclarationNode(method, cu);
+	}
+	
+
+	@SuppressWarnings("rawtypes")
+	private void setMethodDeclaration(MyMethod oldMethod, Iterator iter) {
+		while(iter.hasNext()){
+			TypeDeclaration type = (TypeDeclaration) iter.next();
+			if(type.getName().toString().equals(getTypeName(oldMethod.getParent()))){
+				MethodDeclaration[] mds = type.getMethods();
+				for(int i = 0 ; i < mds.length ; i++){
+					if(isMatched(mds[i], oldMethod.getMd())){
+						this.md = mds[i];
+						astTarget = mds[i].getAST();
+						rewriter = ASTRewrite.create(astTarget);
+						break;
+					}
+				}
+			}	
+		}
+	}
+	
+	public boolean isMatched(MethodDeclaration md1, MethodDeclaration md2){
+		String n1 = getFullName(md1);
+		String n2 = getFullName(md2);
+		return n1.equals(n2);
+	}
+
+	@SuppressWarnings("rawtypes")
+	protected String getFullName(MethodDeclaration md){
+		String name = md.getName().getIdentifier();
+		name += "(";
+		Iterator iter = md.parameters().iterator();
+		
+		while(iter.hasNext()){
+			Object obj = iter.next();
+			if(obj instanceof SingleVariableDeclaration){
+				SingleVariableDeclaration var = (SingleVariableDeclaration) obj;
+				String typeName = var.getType().toString();
+				String[] typeTemp = typeName.split("\\.");
+				typeName = typeTemp[typeTemp.length-1];
+				name += typeName + " ";
+			}
+		}
+		
+		name += ")";
+		
+		return name;
+	}
+	
+	
+	protected  CompilationUnit parse(ICompilationUnit unit) {
+		ASTParser parser = ASTParser.newParser(AST.JLS4);
+		parser.setKind(ASTParser.K_COMPILATION_UNIT);
+		parser.setSource(unit);
+		parser.setResolveBindings(true);
+		parser.setStatementsRecovery(true);
+		parser.setBindingsRecovery(true);
+		
+		return (CompilationUnit) parser.createAST(null); // parse
+	}
+	
+	protected String getTypeName(MyClass c) {
+		String[] sourceFileTmp = c.getID().split("\\.");
+	 	String sourceClassName = sourceFileTmp[sourceFileTmp.length-1];
+		return sourceClassName;
+	}
+
+}

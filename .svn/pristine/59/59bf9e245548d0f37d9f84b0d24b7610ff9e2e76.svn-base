@@ -1,0 +1,339 @@
+package zuna.refactoring.operator.code.modifiers;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Iterator;
+
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.ArrayAccess;
+import org.eclipse.jdt.core.dom.Assignment;
+import org.eclipse.jdt.core.dom.Block;
+import org.eclipse.jdt.core.dom.BooleanLiteral;
+import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.FieldAccess;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.Modifier.ModifierKeyword;
+import org.eclipse.jdt.core.dom.NullLiteral;
+import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.ThisExpression;
+
+import zuna.model.MyClass;
+import zuna.model.MyField;
+import zuna.model.MyMethod;
+import zuna.parser.visitor.FieldReferenceInMethod;
+
+public class MethodModifier extends CodeModifier{
+
+	
+	public void modifyExtractedMethods(MyClass oldClass, ArrayList<MyMethod> extracted,
+			ArrayList<MyField> fieldNames, SupportingMethods supportingMethods,
+			String paramType, String paramName, 
+			boolean isShareAtt, boolean hasInvocation, Hashtable<String, MyField> notShareAttribute){
+		
+		for(MyMethod m: oldClass.getOwnedMethods()){
+			if(isExtracted(m, extracted)){
+				init(m);
+				if(isShareAtt) modifyAttributeShareCase(fieldNames, supportingMethods, paramName, paramType, extracted);
+				if(hasInvocation) this.modifyHasMethodInvCase(oldClass, extracted, paramName);
+				this.modifyInternalInv(oldClass, extracted, super.md, paramName, fieldNames, notShareAttribute); // this should be carefully treated.
+				save();
+				
+			}else if(isNotExtractedButAccessed(m,extracted)){
+				init(m);
+				MethodDeclaration md = super.md;
+				modifyAccessedMethod(md);
+				save();	
+			}
+		}
+	}
+	
+	private void modifyInternalInv(MyClass oldClass, ArrayList<MyMethod> extracted, MethodDeclaration md, String paramName, ArrayList<MyField> fields
+			, Hashtable<String, MyField> notShareAttribute){
+		ArrayList<MethodInvocation> miList = getInvocationInsideExtractedMethod(extracted, md);
+		for(MethodInvocation inv: miList){
+			MethodDeclaration invmd = super.getMD(inv, oldClass);
+			if(super.containReferencesToOldClass(invmd, oldClass.getOwnedMethods(), extracted, fields, notShareAttribute, oldClass)){
+				MethodInvocation newInv = super.md.getAST().newMethodInvocation();
+				newInv = (MethodInvocation)ASTNode.copySubtree(newInv.getAST(), inv);
+				newInv.arguments().add(super.md.getAST().newSimpleName(paramName));
+				rewriter.replace(inv, newInv, null);
+			}
+		}
+	}
+
+	
+	
+	private ArrayList<MethodInvocation> getInvocationInsideExtractedMethod(
+			final ArrayList<MyMethod> extracted, MethodDeclaration md) {
+		
+		final ArrayList<MethodInvocation> invs = new ArrayList<MethodInvocation>();
+		
+		md.accept(new ASTVisitor(){
+			@Override
+			public boolean visit(MethodInvocation inv){
+				
+				if(isExtracted(inv)){
+					invs.add(inv);
+				}
+				
+				return true;
+			}
+			
+			
+			private boolean isExtracted(MethodInvocation inv){
+				boolean flg = false;
+				String invName = getFullName(inv);
+				
+				for(MyMethod m: extracted){
+					String[] split = m.getID().split("\\.");
+					String methodName = split[split.length-1];
+					if(methodName.equals(invName)){
+						flg = true;
+						break;
+					}
+				}
+				return flg;
+			}
+			
+		});
+		return invs;
+	}
+
+	private ArrayList<MethodInvocation> getInvocationFromExtractedMethod(
+			final ArrayList<MyMethod> owned, final ArrayList<MyMethod> extracted, Block block) {
+		
+		final ArrayList<MethodInvocation> invs = new ArrayList<MethodInvocation>();
+		
+		block.accept(new ASTVisitor(){
+			@Override
+			public boolean visit(MethodInvocation inv){
+				
+				if(isOwned(inv) && !isExtracted(inv)){
+					invs.add(inv);
+				}
+				
+				return true;
+			}
+			
+			private boolean isOwned(MethodInvocation inv){
+				boolean flg = false;
+				String invName = getFullName(inv);
+				
+				for(MyMethod m: owned){
+					String[] split = m.getID().split("\\.");
+					String methodName = split[split.length-1];
+					if(methodName.equals(invName)){
+						flg = true;
+						break;
+					}
+				}
+				return flg;
+			}
+			
+			private boolean isExtracted(MethodInvocation inv){
+				boolean flg = false;
+				String invName = getFullName(inv);
+				
+				for(MyMethod m: extracted){
+					String[] split = m.getID().split("\\.");
+					String methodName = split[split.length-1];
+					if(methodName.equals(invName)){
+						flg = true;
+						break;
+					}
+				}
+				return flg;
+			}
+			
+			
+			
+		});
+		return invs;
+	}
+	
+	private void modifyHasMethodInvCase(MyClass oldClass, ArrayList<MyMethod> extracted, String paramName){
+		
+		ArrayList<MethodInvocation> miList = getInvocationFromExtractedMethod
+				(oldClass.getOwnedMethods(), extracted, this.md.getBody());
+		
+		for(MethodInvocation inv: miList){
+			MethodInvocation newInv = this.md.getAST().newMethodInvocation();
+			newInv.setName(this.md.getAST().newSimpleName(inv.getName().getIdentifier()));
+			
+			Iterator iter = inv.arguments().iterator();
+			while(iter.hasNext()){
+				Object obj = iter.next();
+				if(obj instanceof SimpleName){
+					SimpleName n = (SimpleName)obj;
+					newInv.arguments().add(this.md.getAST().newSimpleName(n.getIdentifier()));
+				}else if(obj instanceof ArrayAccess){
+					ArrayAccess a = (ArrayAccess) obj;
+					ArrayAccess a2 = astTarget.newArrayAccess();
+					newInv.arguments().add(ASTNode.copySubtree(a2.getAST(), a));
+				}
+			}
+			newInv.setExpression(astTarget.newSimpleName(paramName));
+			rewriter.replace(inv, newInv, null);
+		}
+	}
+	
+
+	private void modifyAttributeShareCase(ArrayList<MyField> fieldNames,
+			SupportingMethods supportingMethods, String paramName, String paramType,
+			ArrayList<MyMethod> extracted) {
+		
+		FieldReferenceInMethod ReferenceGetter = new FieldReferenceInMethod(fieldNames);
+		md.getBody().accept(ReferenceGetter);
+		ArrayList<Expression> simpleNames = ReferenceGetter.getSimpleNames();
+		
+		
+		for(Expression fc: simpleNames){
+			if(fc.getParent() instanceof FieldAccess){
+				FieldAccess access = (FieldAccess) fc.getParent();
+				if(access.getLocationInParent().getId().equals("leftHandSide")){
+					Assignment exp = (Assignment)access.getParent();
+					MethodInvocation mi = md.getAST().newMethodInvocation();
+					SimpleName sn = supportingMethods.getSetterTable().get(access.getName().toString()).getName();
+					mi.setName(access.getAST().newSimpleName(sn.getIdentifier()));
+					mi.arguments().add(mi.getAST().newSimpleName(exp.getRightHandSide().toString()));
+					mi.setExpression(md.getAST().newSimpleName(paramName));
+					rewriter.replace(exp, mi, null);
+				}else{
+					MethodInvocation mi = md.getAST().newMethodInvocation();
+					SimpleName sn = supportingMethods.getGetterTable().get(access.getName().toString()).getName();
+					mi.setName(access.getAST().newSimpleName(sn.getIdentifier()));
+					mi.setExpression(md.getAST().newSimpleName(paramName));
+					rewriter.replace(access, mi, null);
+				}
+					
+			}else if(fc.getParent() instanceof MethodInvocation){
+				MethodInvocation access = (MethodInvocation) fc.getParent();
+				MethodInvocation access2 = md.getAST().newMethodInvocation();
+				MethodInvocation mi = md.getAST().newMethodInvocation();
+				SimpleName sn = supportingMethods.getGetterTable().get(access.getExpression().toString()).getName();
+				mi.setName(access.getAST().newSimpleName(sn.getIdentifier()));
+				mi.setExpression(md.getAST().newSimpleName(paramName));
+				access2.setExpression(mi);
+				access2.setName(md.getAST().newSimpleName(access.getName().getIdentifier()));
+				Iterator iter = access.arguments().iterator();
+				access2 = setArguments(fieldNames, supportingMethods, paramName, extracted, access2, iter);
+				rewriter.replace(access, access2, null);
+			}
+		}
+	}
+
+
+	private MethodInvocation setArguments(ArrayList<MyField> fieldNames,
+			SupportingMethods supportingMethods, String paramName,
+			ArrayList<MyMethod> extracted, MethodInvocation access2,
+			Iterator iter) {
+		
+		while(iter.hasNext())
+		{
+			Object obj = iter.next();
+			if(obj instanceof SimpleName)
+			{
+				SimpleName argName = astTarget.newSimpleName(((SimpleName) obj).getIdentifier());
+				if(isField(argName, fieldNames)){
+					MethodInvocation getter = astTarget.newMethodInvocation();
+					SimpleName argGetter = supportingMethods.getGetterTable().get(argName.getFullyQualifiedName()).getName();
+					getter.setName(astTarget.newSimpleName(argGetter.getIdentifier()));
+					getter.setExpression(md.getAST().newSimpleName(paramName));
+					access2.arguments().add(getter);
+				}
+				else
+				{
+					access2.arguments().add(argName);
+				}
+
+			}
+			else if(obj instanceof ThisExpression)
+			{
+				access2.arguments().add(astTarget.newThisExpression());
+			}
+			else if(obj instanceof BooleanLiteral)
+			{
+				BooleanLiteral bool = (BooleanLiteral) obj;
+				BooleanLiteral boolCopied = astTarget.newBooleanLiteral(bool.booleanValue());
+				access2.arguments().add(boolCopied);
+			}
+			else if(obj instanceof NullLiteral)
+			{
+				NullLiteral nullLit = (NullLiteral) obj;
+				access2.arguments().add(astTarget.newNullLiteral());
+			}
+			else if(obj instanceof MethodInvocation)
+			{
+				MethodInvocation inv = (MethodInvocation) obj;
+				if(inv.getExpression()==null || inv.getExpression().toString().equals("this"))
+				{
+					if(isExtracted(inv.getName().getIdentifier(), extracted))
+					{
+						inv.setExpression(astTarget.newThisExpression());
+						inv.arguments().add(astTarget.newSimpleName(paramName));
+					}
+				}
+				MethodInvocation invCopied = astTarget.newMethodInvocation();
+				access2.arguments().add(ASTNode.copySubtree(invCopied.getAST(), inv));
+			}
+		}
+		
+		return access2;
+	}
+	
+
+	
+	private void modifyAccessedMethod(MethodDeclaration md){
+		MethodDeclaration newMd = astTarget.newMethodDeclaration();
+		newMd = (MethodDeclaration)ASTNode.copySubtree(newMd.getAST(), md);
+		Iterator iter = newMd.modifiers().iterator();
+		while(iter.hasNext()){
+			Object obj = iter.next();
+			Modifier mod = (Modifier) obj;
+			if(mod.getKeyword().toString().equals("private")){
+				mod.delete();
+				newMd.modifiers().add(this.astTarget.newModifier(ModifierKeyword.PUBLIC_KEYWORD));
+			}
+		}
+		rewriter.replace(md, newMd, null);
+	}
+
+	private boolean isField(SimpleName ref, ArrayList<MyField> fields){
+		
+		for(MyField f: fields){
+			String[] tokens = f.getID().split("\\.");
+			String fieldName = tokens[tokens.length-1];
+			
+			if(fieldName.equals(ref.getIdentifier())){
+				return true;
+			}
+		}
+		return false;
+		
+	}
+	
+	private boolean isExtracted(MyMethod m, ArrayList<MyMethod> extracted){
+		for(MyMethod ext: extracted){
+			if(ext.getID().equals(m.getID())){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private boolean isNotExtractedButAccessed(MyMethod m, ArrayList<MyMethod> extracted){
+		ArrayList<MyMethod> fanin = m.getFanIn();
+		for(MyMethod ext: extracted){
+			for(MyMethod in: fanin){
+				if(in.getID().equals(ext.getID())){
+					return true;
+				}
+			}
+		}
+		
+		return false;
+	}
+}

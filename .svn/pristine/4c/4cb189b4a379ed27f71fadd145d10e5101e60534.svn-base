@@ -1,0 +1,417 @@
+package zuna.refactoring.ui.views.classDecomposesrViews.graph;
+
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Frame;
+import java.awt.Paint;
+import java.awt.Stroke;
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Hashtable;
+import java.util.Vector;
+
+import org.apache.commons.collections15.Transformer;
+import org.eclipse.jface.dialogs.ProgressMonitorDialog;
+import org.eclipse.jface.operation.IRunnableWithProgress;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.awt.SWT_AWT;
+import org.eclipse.swt.events.MouseEvent;
+import org.eclipse.swt.events.MouseListener;
+import org.eclipse.swt.events.MouseWheelListener;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Scale;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Text;
+import org.eclipse.ui.IWorkbenchPartSite;
+import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.part.ViewPart;
+
+import zuna.clustering.HAC.HierarchicalClustering;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.experiment.decompose.RealLargeClass;
+import zuna.refactoring.operator.ExtractClassProgress;
+import zuna.refactoring.ui.views.classDecomposesrViews.graph.MyGraph.MyLink;
+import zuna.refactoring.ui.views.classDecomposesrViews.graph.MyGraph.MyNode;
+import edu.uci.ics.jung.algorithms.layout.AggregateLayout;
+import edu.uci.ics.jung.algorithms.layout.FRLayout;
+import edu.uci.ics.jung.algorithms.layout.Layout;
+import edu.uci.ics.jung.graph.Graph;
+import edu.uci.ics.jung.visualization.VisualizationViewer;
+import edu.uci.ics.jung.visualization.control.AbstractModalGraphMouse;
+import edu.uci.ics.jung.visualization.control.CrossoverScalingControl;
+import edu.uci.ics.jung.visualization.control.DefaultModalGraphMouse;
+import edu.uci.ics.jung.visualization.control.ModalGraphMouse;
+import edu.uci.ics.jung.visualization.control.ScalingControl;
+import edu.uci.ics.jung.visualization.decorators.ToStringLabeller;
+
+public class ResultViewer extends ViewPart {
+	private Composite parent;
+	private Vector<Vector<String>> result = new Vector<Vector<String>>();
+	private Hashtable<String, Double> matrix = new Hashtable<String, Double>();
+	
+	private Composite composite;
+	private Frame frame;
+	private Scale scale;
+	private VisualizationViewer<MyNode,MyLink> vv;
+	public static RealLargeClass decomposer;
+	public static double wf;
+	
+	public ResultViewer() {
+	
+	}
+	
+	Transformer<MyNode,Paint> vertexColor = new Transformer<MyNode,Paint>() {
+        public Paint transform(MyNode node) {
+        	float[] hsv = new float[3];
+        	int[] rgb = node.rgb;
+        	hsv = Color.RGBtoHSB(rgb[0], rgb[1], rgb[2], hsv);
+            return Color.getHSBColor(hsv[0], hsv[1], hsv[2]);
+        }
+    };
+    
+    private Transformer<MyLink, Paint> edgeColor = new Transformer<MyLink, Paint>() {
+        public Paint transform(MyLink s) {
+            return Color.WHITE;
+        }
+    };
+    
+    
+    private Transformer<MyLink, Stroke> edgeStrokeTransformer = new Transformer<MyLink, Stroke>() {
+        float dash[] = { 10.0f };
+        BasicStroke inter = new BasicStroke(1.0f, BasicStroke.CAP_BUTT,
+                BasicStroke.JOIN_MITER, 10.0f, dash, 0.0f);
+        public Stroke transform(MyLink s) {
+        	if(s.isIntra()) return null;
+        	else return inter;
+        }
+    };
+    
+    private Text text;
+    private Button btnNewButton;
+    private Text text_1;
+    
+    public Vector<Vector<String>> getResult(){
+    	return this.result;
+    }
+    
+    public boolean merge(String from, int to){
+    	
+    	int clusterIDOfSelectedNode = this.getClusterOfSelectedNode(from);
+    	if(clusterIDOfSelectedNode==to) return false;
+    	else{
+    		result.get(to).add(from);
+    		for(int i = 0 ; i < result.get(clusterIDOfSelectedNode).size() ;i++){
+    			if(result.get(clusterIDOfSelectedNode).get(i).equals(from)){
+    				result.get(clusterIDOfSelectedNode).remove(i);
+    				if(result.get(clusterIDOfSelectedNode).size()==0)
+    					result.remove(clusterIDOfSelectedNode);
+    				break;
+    			}
+    		}
+    		
+    		
+    		return true;
+    	}
+    	
+    }
+    
+    private int getClusterOfSelectedNode(String from){
+    	for(int i = 0 ; i < this.result.size() ; i++){
+    		Vector<String> cluster = this.result.get(i);
+    		for(String c: cluster){
+    			if(c.equals(from)){
+    				return i; 
+    			}
+    		}
+    	}
+    	
+    	return -1;
+    }
+    public boolean split(String id){
+    	if(this.removeSelectedNode(id)){
+    		Vector<String> newCluster = new Vector<String>();
+    		newCluster.add(id);
+    		this.result.add(newCluster);
+    		return true;
+    	}else{
+    		return false;
+    	}
+    }
+    
+    private boolean removeSelectedNode(String id){
+    	for(int i = 0 ; i < this.result.size() ; i++){
+    		Vector<String> cluster = this.result.get(i);
+    		for(int k = 0 ; k < cluster.size() ; k++){
+    			String c = cluster.get(k);
+    			if(c.equals(id)){
+    				this.result.get(i).remove(k);
+    				return true;
+    			}
+    		}
+    	}
+    	
+    	return false;
+    }
+    public void redraw(double update, boolean isManual) {
+		wf =update;
+		parent.getChildren()[parent.getChildren().length-6].dispose();
+		parent.getChildren()[parent.getChildren().length-5].dispose();
+		parent.getChildren()[parent.getChildren().length-4].dispose();
+		parent.getChildren()[parent.getChildren().length-3].dispose();
+		parent.getChildren()[parent.getChildren().length-2].dispose();
+		parent.getChildren()[parent.getChildren().length-1].dispose();
+		
+		if(isManual) attributeAdjusting();
+		else clustering();
+		
+		createScale(parent, update);
+		createThText(parent, update);
+		createNoOfClusterText(parent);
+		createFrame(parent);
+		createButton(parent);
+		
+		parent.redraw();
+		parent.update();
+		parent.layout();
+	}
+
+	private void attributeAdjusting() {
+		
+		Vector<String> attributes = this.removeAndRetrieveAttributes();
+		HierarchicalClustering clusterer = new HierarchicalClustering();
+		for(String attribute: attributes){
+			int idx = clusterer.getMostReferredClusterIndex(this.result, attribute);
+			if(idx>-1){
+				this.result.get(idx).add(attribute);
+			}else if(idx==-1){
+				this.result.get(clusterer.getMaxSizeClusterIdx(this.result)).add(attribute);
+			}
+		}
+	}
+	
+	private Vector<String> removeAndRetrieveAttributes(){
+		Vector<String> attributes = new Vector<String>();
+		
+		for(int i = 0 ; i < this.result.size() ; i++){
+			ArrayList<Integer> remove = new ArrayList<Integer>();
+			for(int k = 0 ; k < this.result.get(i).size(); k++){
+				if(!ProjectAnalyzer.project.getMethodList().containsKey(this.result.get(i).get(k))){
+					attributes.add(this.result.get(i).get(k));
+					remove.add(k);
+				}
+			}
+			
+			Collections.sort(remove, Collections.reverseOrder());
+			for(int removeIdx: remove){
+				this.result.get(i).remove(removeIdx);
+			}
+		}
+
+		ArrayList<Integer> remove = new ArrayList<Integer>();
+		for(int i = 0 ; i < this.result.size() ; i++){
+			if(this.result.get(i).size()==0) remove.add(i);
+		}
+		Collections.sort(remove, Collections.reverseOrder());
+		for(int removeIdx: remove){
+			this.result.remove(removeIdx);
+		}
+		
+		return attributes;
+	}
+
+	private void createFrame(final Composite parent) {
+		composite = new Composite(parent, SWT.H_SCROLL | SWT.V_SCROLL | SWT.NO_BACKGROUND | SWT.EMBEDDED);
+		GridData gd_composite = new GridData(SWT.FILL, SWT.FILL, true, true, 4, 1);
+		gd_composite.heightHint = 359;
+		composite.setLayoutData(gd_composite);
+		getJungFrame();
+	}
+
+	private void createThText(final Composite parent, double update) {
+		text = new Text(parent, SWT.BORDER);
+		GridData gd_text = new GridData(SWT.FILL, SWT.FILL, true, false, 1, 1);
+		gd_text.widthHint = 120;
+		text.setText("Current TH = " + update/100.0);
+		text.setLayoutData(gd_text);
+	}
+
+	private void createNoOfClusterText(final Composite parent) {
+		text_1 = new Text(parent, SWT.BORDER);
+		text_1.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+		text_1.setText("# of Clusters : " + result.size());
+		new Label(parent, SWT.NONE);
+	}
+
+	@Override
+	public void createPartControl(final Composite parent) {
+		this.parent = parent;
+		int initialTh = 21;
+		if(decomposer==null){
+			PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().hideView(this);
+		}
+		
+    	parent.setLayout(new GridLayout(4, false));
+		createScale(parent, initialTh);
+		
+		clustering();
+
+		createThText(parent, initialTh);
+		createNoOfClusterText(parent);
+		createFrame(parent); 
+		createButton(parent);
+		
+	}
+
+	private void addListener() {
+		
+		scale.addMouseWheelListener(new MouseWheelListener(){
+
+			@Override
+			public void mouseScrolled(MouseEvent e) {
+				double update = (double)scale.getSelection();
+				redraw(update, false);
+			}
+			
+		});
+		
+		scale.addMouseListener(new MouseListener(){
+
+			@Override
+			public void mouseDoubleClick(MouseEvent e) {
+				
+			}
+
+			@Override
+			public void mouseDown(MouseEvent e) {
+				
+			}
+
+			@Override
+			public void mouseUp(MouseEvent e) {
+				double update = (double)scale.getSelection();
+				
+				redraw(update, false);
+			}
+			
+		});
+	}
+
+	private void createScale(final Composite parent, double update) {
+		scale = new Scale(parent, SWT.NONE);
+		GridData gd_scale = new GridData(SWT.FILL, SWT.CENTER, true, false, 4, 1);
+		gd_scale.widthHint = 587;
+		scale.setLayoutData(gd_scale);
+		scale.setMaximum (100);
+		scale.setPageIncrement (1);
+		scale.setSelection((int)update);
+		addListener();
+	}
+
+	private Frame getJungFrame() {
+		frame = SWT_AWT.new_Frame(composite);
+		MyGraph sgv = new MyGraph(result, matrix);
+		Layout<MyNode, MyLink> layout = getLayout(sgv);
+		
+		this.getVisualizationViewer(layout, sgv.g);
+		frame.add(vv);
+		
+		return frame;
+	}
+
+	private Layout<MyNode, MyLink> getLayout(MyGraph sgv) {
+		final AggregateLayout<MyNode,MyLink> layout = 
+				new AggregateLayout<MyNode,MyLink>(new FRLayout<MyNode,MyLink>(sgv.g));
+		return layout;
+	}
+
+	private void getVisualizationViewer(Layout<MyNode, MyLink> layout, Graph<MyNode, MyLink> g){
+		vv = new VisualizationViewer<MyNode, MyLink>(layout);
+//		vv.setPreferredSize(new Dimension(500,500));
+
+
+		double amount = 1.0;    // Or negative to zoom out.
+		ScalingControl scaler = new CrossoverScalingControl();
+		scaler.scale(vv, amount > 0 ? 1.1f : 1 / 1.1f, vv.getCenter());
+		
+		
+		 // Show vertex and edge labels
+		vv.getRenderContext().setVertexLabelTransformer(new ToStringLabeller<MyNode>());
+		vv.getRenderContext().setEdgeLabelTransformer(new ToStringLabeller<MyLink>());
+	    vv.getRenderContext().setVertexFillPaintTransformer(vertexColor);
+	    
+	    vv.getRenderContext().setEdgeStrokeTransformer(
+				edgeStrokeTransformer);
+        vv.getRenderContext().setEdgeDrawPaintTransformer(edgeColor);
+        vv.getRenderContext().setLabelOffset(20);
+        
+		// Create a graph mouse and add it to the visualization component
+		AbstractModalGraphMouse graphMouse = new DefaultModalGraphMouse<Object, Object>();
+        graphMouse.setMode(ModalGraphMouse.Mode.PICKING);
+        vv.setGraphMouse(graphMouse);
+        
+        graphMouse.add(new PopupGraphMousePlugin(this));
+	}
+	
+	private void clustering() {
+		decomposer.setResult(new Vector<Vector<String>>());
+		decomposer.setMatrix(new Hashtable<String, Double>());
+		decomposer.setWeighingFactor(wf);
+		decomposer.analyze();
+		result = decomposer.getResult();
+		matrix = decomposer.getMatrix();
+	}
+	
+	@Override
+	public void setFocus() {
+
+	}
+	
+
+	private void createButton(final Composite parent) {
+		btnNewButton = new Button(parent, SWT.NONE);
+		btnNewButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 4, 1));
+		btnNewButton.setText("Extract Class");
+		
+		btnNewButton.addMouseListener(new MouseListener(){
+
+			@Override
+			public void mouseDoubleClick(MouseEvent e) {
+				
+			}
+
+			@Override
+			public void mouseDown(MouseEvent e) {
+				
+			}
+
+			@Override
+			public void mouseUp(MouseEvent e) {	
+				
+	            try {
+	            	final IWorkbenchPartSite targetSite = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getPartService()
+	            			.getActivePart().getSite();
+	            	IRunnableWithProgress entity = new ExtractClassProgress(result, targetSite);
+					new ProgressMonitorDialog(new Shell()).run(true, true, entity);
+				} catch (InvocationTargetException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				} catch (InterruptedException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+				
+			}
+			
+		});
+		
+	}
+	
+	
+	
+	
+}

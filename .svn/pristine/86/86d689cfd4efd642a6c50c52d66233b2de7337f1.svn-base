@@ -1,0 +1,113 @@
+package zuna.refactoring.operator.code.modifiers;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+
+import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
+import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
+
+import zuna.refactoring.ui.operator.Rewrite;
+
+public class CallerRewrite extends Rewrite{
+
+	private String identifierOfNewField;
+	private String typeOfNewField;
+	private ArrayList<MethodInvocation> invocation = new ArrayList<MethodInvocation>();
+	private IMethod callee;
+	public CallerRewrite(IMethod m){
+		super(m);
+	}
+	
+	private CallerRewrite(IMethod m, String type, String identifier, IMethod callee){
+		super(m);
+		this.typeOfNewField = type;
+		this.identifierOfNewField = identifier;
+		this.callee = callee;
+	}
+	
+
+	public String getIdentifierOfNewField() {
+		return identifierOfNewField;
+	}
+
+	public String getTypeOfNewField() {
+		return typeOfNewField;
+	}
+
+	public void changePointerOfCallerTo(HashSet<IMethod> callerMethods, IMethod callee){
+		for(IMethod m: callerMethods){
+			CallerRewrite rewrite = new CallerRewrite(m, this.typeOfNewField, this.identifierOfNewField, callee);
+			rewrite.changePointer(m);
+		}
+	}
+
+	private void changePointer(IMethod m){
+		ArrayList<MethodInvocation> miList = this.getMethodInvocationStatement(m);
+		for(MethodInvocation inv: miList){
+
+			try {
+				MethodInvocation newInv = astTarget.newMethodInvocation();
+				newInv = (MethodInvocation)ASTNode.copySubtree(newInv.getAST(), inv);
+				newInv.setExpression(newInv.getAST().newSimpleName(this.identifierOfNewField));
+				rewriter = ASTRewrite.create(inv.getParent().getAST());
+				rewriter.replace(inv, newInv, null);
+				super.save();
+			} catch (IllegalArgumentException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	private ArrayList<MethodInvocation> getMethodInvocationStatement(IMethod m){
+		invocation.clear();
+		try {
+			MethodDeclaration md = super.getMethodDecl(m);
+			md.accept(new ASTVisitor(){
+				public boolean visit(MethodInvocation inv){
+					if(this.isMatched(inv)){
+						invocation.add(inv);
+					}
+					return true;
+				}
+				
+				private boolean isMatched(MethodInvocation inv){
+					if(inv.resolveMethodBinding()==null){
+						return true;
+					}
+					return false;
+				}
+			});
+		} catch (JavaModelException e) {
+			e.printStackTrace();
+		}
+		
+		return invocation;
+	}
+	
+	public void makeNewField(IType targetType, IMethod newMethod, HashSet<IType> callerClasses){
+		try {
+			for(IType type: callerClasses){
+				type.createField(getFieldDecl(targetType), null, false, new NullProgressMonitor());
+			}
+			
+		} catch (JavaModelException e) {
+			e.printStackTrace();
+		}
+	}
+
+	private String getFieldDecl(IType newClass){
+		typeOfNewField = newClass.getElementName();
+		identifierOfNewField = typeOfNewField.toLowerCase();
+		return "private " + typeOfNewField + " " + identifierOfNewField + " = new " + typeOfNewField + "();"; 
+	}
+	
+}

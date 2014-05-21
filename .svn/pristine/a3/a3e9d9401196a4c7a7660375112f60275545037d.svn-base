@@ -1,0 +1,81 @@
+package zuna.refactoring.code;
+
+import java.util.ArrayList;
+
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+
+import zuna.model.MyClass;
+import zuna.parser.visitor.AbstractTypeDeclarationVisitor;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.ui.views.classDecomposesrViews.graph.ExtractionHelper;
+
+public class ClassCreateChanger extends ChangeRewrite {
+
+	private String name; 
+	private IPackageFragment ipackage;
+	private MyClass oldClass;
+	private MyClass newClass;
+	
+	public ClassCreateChanger(MyClass oldClass, String name, IPackageFragment ipackage){
+		this.name = name;
+		this.ipackage = ipackage;
+		this.oldClass = oldClass;
+	}
+
+
+	@Override
+	public void changeProject() {
+		ICompilationUnit iUnit = oldClass.getParent().getPf().getCompilationUnit(this.name);
+		CompilationUnit unit = ExtractionHelper.parse(iUnit);
+		AbstractTypeDeclarationVisitor typeVisitor = new AbstractTypeDeclarationVisitor();
+		unit.accept(typeVisitor);
+		ArrayList<TypeDeclaration> classType = typeVisitor.getTypes();
+		TypeDeclaration td = classType.get(0);
+		String fullName = unit.getTypeRoot().findPrimaryType().getFullyQualifiedName();
+		this.newClass = new MyClass(fullName, td, unit, oldClass.getParent());
+		MyClass superClass = ProjectAnalyzer.project.getClass("java.lang.Object");
+		this.newClass.setSuperClass(superClass);
+		ProjectAnalyzer.project.getClassList().put(fullName, this.newClass);
+	}
+	
+	
+
+	public MyClass getNewClass() {
+		return newClass;
+	}
+
+
+	@Override
+	protected void modify() {
+		// TODO Auto-generated method stub
+		try {
+			String cont = "";
+			cont = getHeader(name, ipackage, cont);
+			cont = getFooter(cont);
+			super.save(name, ipackage, cont);
+			
+		} catch (JavaModelException e) {
+			
+		}
+	}
+	
+	private String getHeader(String name, IPackageFragment ipackage, String cont) {
+		if(!ipackage.getElementName().trim().equals("")){
+			cont +="package "+ ipackage.getElementName() +";\n\n";
+		}
+		
+		
+		cont +="\n public class " + name.split("\\.")[0] + "{ \n\n";
+		return cont;
+	}
+	
+	private String getFooter(String cont) {
+		cont+="}";
+		return cont;
+	}
+
+}

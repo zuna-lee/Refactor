@@ -1,0 +1,240 @@
+package zuna.refactoring.operator.code.modifiers;
+
+import java.util.Hashtable;
+import java.util.Iterator;
+
+import org.eclipse.jdt.core.dom.Assignment;
+import org.eclipse.jdt.core.dom.Block;
+import org.eclipse.jdt.core.dom.ExpressionStatement;
+import org.eclipse.jdt.core.dom.FieldAccess;
+import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.ITypeBinding;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.Modifier.ModifierKeyword;
+import org.eclipse.jdt.core.dom.ParameterizedType;
+import org.eclipse.jdt.core.dom.PrimitiveType;
+import org.eclipse.jdt.core.dom.PrimitiveType.Code;
+import org.eclipse.jdt.core.dom.ReturnStatement;
+import org.eclipse.jdt.core.dom.SimpleType;
+import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
+import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
+
+import zuna.model.MyClass;
+import zuna.model.MyField;
+
+public class SupportingMethods extends CodeModifier{
+ 	
+	private Hashtable<String, MethodDeclaration> getterTable = new Hashtable<String, MethodDeclaration>();
+	private Hashtable<String, MethodDeclaration> setterTable = new Hashtable<String, MethodDeclaration>();
+
+	
+	public void createGetterSetter(MyClass oldClass, Hashtable<String, MyField> notShareAttribute){
+		this.init(oldClass);
+		this.makeSupportingMethods(notShareAttribute);
+		this.save();
+	}
+	
+	private void makeSupportingMethods(Hashtable<String, MyField> notShareAttribute){
+		FieldDeclaration[] fieldDecls = typeDecl.getFields();
+		
+		for(FieldDeclaration fieldDecl: fieldDecls){
+			if(!this.isNotShared(fieldDecl, notShareAttribute)){
+				Iterator iter = fieldDecl.fragments().iterator();
+				while(iter.hasNext()){
+					VariableDeclarationFragment fragment = (VariableDeclarationFragment)iter.next();
+					ITypeBinding type = fragment.resolveBinding().getType();
+					String name = fragment.getName().toString();
+					
+					this.makeGetter(type, name);
+					if(!isFinal(fieldDecl)) this.makeSetter(type, name);
+				}
+			}
+			
+		}
+	}
+	
+	private boolean isNotShared(FieldDeclaration fd, Hashtable<String, MyField> notShareAttribute){
+		for(String key: notShareAttribute.keySet()){
+			FieldDeclaration fd1 = notShareAttribute.get(key).getFd();
+			if(fd.toString().equals(fd1.toString())){
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	private boolean isFinal(FieldDeclaration fieldDecl){
+		Iterator iter = fieldDecl.modifiers().iterator();
+		
+		while(iter.hasNext()){
+			Object obj = iter.next();
+			if(obj instanceof Modifier){
+				String modifier = ((Modifier)obj).getKeyword().toString();
+				if(modifier.equals("final")){
+					return true;
+				}
+			}
+		}
+		
+		return false;
+	}
+	@SuppressWarnings("unchecked")
+	private void makeGetter(ITypeBinding varType, String varName){
+		String getterName = "get";
+		getterName+=String.valueOf(varName.charAt(0)).toUpperCase() + varName.substring(1);
+		MethodDeclaration md = this.isExist(getterName);
+		
+		if(md==null){
+			md = this.astTarget.newMethodDeclaration();
+		}else{
+			this.getterTable.put(varName, md);
+			return;
+		}
+		
+		md.setName(this.astTarget.newSimpleName(getterName));
+		
+		if(varType.isPrimitive()){
+			md.setReturnType2(astTarget.newPrimitiveType(this.getCode(varType.getQualifiedName())));
+		}else{
+			md.setReturnType2(astTarget.newSimpleType(astTarget.newName(varType.getQualifiedName())));
+		}
+		
+		md.modifiers().add(this.astTarget.newModifier(ModifierKeyword.PUBLIC_KEYWORD));
+		  
+		Block body = this.astTarget.newBlock();
+		ReturnStatement rs = this.astTarget.newReturnStatement();
+		rs.setExpression(this.astTarget.newSimpleName(varName));
+		body.statements().add(rs);
+		md.setBody(body);
+		
+		ListRewrite importRewrite = rewriter.getListRewrite(typeDecl, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
+		importRewrite.insertLast(md, null);
+		
+		this.getterTable.put(varName, md);
+	}
+	
+	private MethodDeclaration isExist(String name){
+		MethodDeclaration[] methodDecl = this.typeDecl.getMethods();
+		
+		for(MethodDeclaration md: methodDecl){
+			if(md.getName().toString().equals(name)){
+				return md;
+			}
+		}
+		return null;
+	}
+	
+	private Code getCode(String varType){
+		if(varType.equals("long")){
+			return PrimitiveType.LONG;
+		}else if(varType.equals("int")){
+			return PrimitiveType.INT;
+		}else if(varType.equals("float")){
+			return PrimitiveType.BOOLEAN;
+		}else if(varType.equals("char")){
+			return PrimitiveType.CHAR;
+		}else if(varType.equals("boolean")){
+			return PrimitiveType.BOOLEAN;
+		}else if(varType.equals("byte")){
+			return PrimitiveType.BYTE;
+		}else if(varType.equals("double")){
+			return PrimitiveType.DOUBLE;
+		}else if(varType.equals("short")){
+			return PrimitiveType.SHORT;
+		}else{
+			return PrimitiveType.VOID;
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private void makeSetter(ITypeBinding varType, String varName){
+		String setterName = "set";
+		setterName+=String.valueOf(varName.charAt(0)).toUpperCase() + varName.substring(1);
+		MethodDeclaration md = this.isExist(setterName);
+		if(md == null){
+			md = this.astTarget.newMethodDeclaration();
+		}else{
+			this.setterTable.put(varName, md);
+			return;
+		}
+		
+		md.setName(this.astTarget.newSimpleName(setterName));
+		md.setReturnType2(astTarget.newPrimitiveType(PrimitiveType.VOID));
+		
+		SingleVariableDeclaration variableDeclaration;
+		if(varType.isPrimitive()){
+			variableDeclaration = astTarget.newSingleVariableDeclaration();
+			variableDeclaration.setType(astTarget.newPrimitiveType(this.getCode(varType.getQualifiedName())));
+			variableDeclaration.setName(this.astTarget.newSimpleName(varName));
+			md.parameters().add(variableDeclaration);
+			
+		}else if (varType.isParameterizedType()){
+			SimpleType n = astTarget.newSimpleType(astTarget.newName(varType.getJavaElement().getElementName()));
+			ITypeBinding[] typeArgs = varType.getTypeArguments();
+			ParameterizedType pt = astTarget.newParameterizedType(n);
+			
+			for(ITypeBinding arg: typeArgs){
+				pt.typeArguments().add(astTarget.newSimpleType(astTarget.newSimpleName(arg.getName())));				
+			}
+			
+			variableDeclaration = astTarget.newSingleVariableDeclaration();
+			variableDeclaration.setType(pt);
+			
+			variableDeclaration.setName(astTarget.newSimpleName(varName));
+			md.parameters().add(variableDeclaration);
+		}else{
+			variableDeclaration = astTarget.newSingleVariableDeclaration();
+			variableDeclaration.setType(astTarget.newSimpleType(astTarget.newName(varType.getName())));
+			
+			variableDeclaration.setName(astTarget.newSimpleName(varName));
+			md.parameters().add(variableDeclaration);
+		}
+				
+		md.modifiers().add(this.astTarget.newModifier(ModifierKeyword.PUBLIC_KEYWORD));
+		  
+		Block body = this.astTarget.newBlock();
+		Assignment assignment = this.astTarget.newAssignment();
+		
+		FieldAccess fieldAccess= astTarget.newFieldAccess();
+		fieldAccess.setName(this.astTarget.newSimpleName(varName));
+		fieldAccess.setExpression(astTarget.newThisExpression());
+		
+		assignment.setLeftHandSide(fieldAccess);
+		assignment.setRightHandSide(this.astTarget.newSimpleName(varName));
+		
+		ExpressionStatement statement = this.astTarget.newExpressionStatement(assignment);
+		body.statements().add(statement);
+		md.setBody(body);
+		
+		ListRewrite importRewrite = rewriter.getListRewrite(typeDecl, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
+		importRewrite.insertLast(md, null);
+		
+		this.setterTable.put(varName, md);
+	}
+	
+	
+	public Hashtable<String, MethodDeclaration> getGetterTable() {
+		return getterTable;
+	}
+
+
+	public void setGetterTable(Hashtable<String, MethodDeclaration> getterTable) {
+		this.getterTable = getterTable;
+	}
+
+
+	public Hashtable<String, MethodDeclaration> getSetterTable() {
+		return setterTable;
+	}
+
+
+	public void setSetterTable(Hashtable<String, MethodDeclaration> setterTable) {
+		this.setterTable = setterTable;
+	}
+
+	
+}

@@ -1,0 +1,398 @@
+package zuna.refactoring;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Hashtable;
+
+import org.apache.commons.math3.stat.descriptive.moment.Mean;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.IPackageFragmentRoot;
+import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTParser;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.EnumDeclaration;
+import org.eclipse.jdt.core.dom.ITypeBinding;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+
+import zuna.metric.classDS.ArchitectureBasedDS;
+import zuna.metric.classDS.ClassCouplingBasedDS;
+import zuna.metric.classDS.InformationContents4System;
+import zuna.metric.classDS.InformationContentsInInheritance;
+import zuna.metric.classDS.InheritanceBasedDS;
+import zuna.model.MyClass;
+import zuna.model.MyField;
+import zuna.model.MyMethod;
+import zuna.model.MyPackage;
+import zuna.model.Repo;
+import zuna.parser.visitor.AbstractTypeDeclarationVisitor;
+import zuna.util.Logger2File;
+
+public class ProjectAnalyzer{
+	public static IProject iproject;
+	public static Hashtable<String, Metric> metrics = new Hashtable<String, Metric>();
+	public static Repo project;
+	public static String prjName;
+	public static Repo mutatedProject;
+	public static ArrayList<String> mutatedPair = new ArrayList<String>();
+	public static String url;
+	public static ArrayList<String> left = new ArrayList<String>();
+	public static ArrayList<String> right = new ArrayList<String>();
+
+	public static int avgIDF= 0;
+	
+	public static void analyze(IProject iproject) {
+
+		ProjectAnalyzer.iproject = iproject;
+		ProjectAnalyzer.prjName = iproject.getName();
+		
+		Repo iRepo = new Repo(ProjectAnalyzer.iproject.getName());
+		ProjectAnalyzer.url = ProjectAnalyzer.iproject.getLocationURI().getPath().toString().substring(1);
+ 		MyPackage root = new MyPackage("ROOT", true); 
+ 		
+ 		try {
+ 			IPackageFragment[] packages = JavaCore.create(ProjectAnalyzer.iproject).getPackageFragments();
+ 			
+ 			
+ 			for (int i = 0; i < packages.length; i++) {
+ 				IPackageFragment mypackage = packages[i];
+ 				if (mypackage.getKind() == IPackageFragmentRoot.K_SOURCE) {
+ 					if(isTarget(mypackage))
+ 						iRepo.createProjectPackage(root, mypackage.getElementName(), mypackage);
+ 				}
+ 			}
+ 			
+ 			getEntities(iRepo, packages);
+ 			System.out.println("End of Analyzing Entities: " + iRepo.getClassList().size() + " Classes");
+ 			ProjectAnalyzer.project = iRepo;
+ 			
+
+ 			makeFanout();
+ 			makeFanin();
+ 			makeClassesInSystem();
+ 			makeInheritance();
+ 			makeIDFTable();
+ 			addMethods();
+ 			System.out.println("relationship end");
+ 			
+ 			calculateIC();
+ 			System.out.println("ic calculation end");
+ 			
+ 			
+ 		} catch (CoreException e) {
+ 		    e.printStackTrace();
+ 		}
+	}
+
+	private static void addMethods(){
+		for(String key: project.getClassList().keySet()){
+			MyClass c = project.getClassList().get(key);
+			ArrayList<MyMethod> methods = c.getOwnedMethods();
+			for(MyMethod m: methods){
+				if(!project.getMethodList().containsKey(m.getID())){
+					project.getMethodList().put(m.getID(), m);
+				}
+			}
+		}
+	}
+	private static boolean isTarget(IPackageFragment mypackage){
+		if(prjName.startsWith("PicketLink")){
+			if(mypackage.getPath().toString().startsWith("/PicketLink_300/src/org/picketlink/identity/federation/core/")
+					||mypackage.getPath().toString().startsWith("/PicketLink_300/src/org/picketlink/identity/federation/bindings/")
+					||mypackage.getPath().toString().startsWith("/PicketLink_300/src/org/picketlink/identity/federation/newmodel/")){
+					return true;
+			}else{
+				return false;
+			}
+		}else{
+			return true;
+		}
+	}
+	
+	private static void makeIDFTable(){
+		for(String key: ProjectAnalyzer.project.getClassList().keySet()){
+			MyClass c = ProjectAnalyzer.project.getClassList().get(key);
+			ArrayList<MyMethod> methods = c.getOwnedMethods();
+			for(MyMethod m: methods){
+				ArrayList<MyMethod> outs = m.getFanOut();
+				for(MyMethod out: outs){
+					if(!out.getParent().getID().equals(c.getID())){
+						out.getParent().addNoOfCalls();
+					}
+				}
+			}
+		}
+		
+		double i[]= new double[ProjectAnalyzer.project.getClassList().keySet().size()];
+		int cnt=0;
+		for(String key: ProjectAnalyzer.project.getClassList().keySet()){
+			MyClass c = ProjectAnalyzer.project.getClassList().get(key);
+			i[cnt] = c.getNoOfCalls();
+			cnt++;
+		}
+		
+//		avgIDF = new Mean().evaluate(i);
+	}
+	
+	private static void makeClassesInSystem() {
+		for(String key: ProjectAnalyzer.project.getClassList().keySet()){
+			MyClass c = ProjectAnalyzer.project.getClass(key);
+			if(!c.isLibrary() && !c.getID().equals("")){
+				ProjectAnalyzer.project.addClassesInSystem(key);
+			}
+		}
+	}
+
+	private static void calculateIC(){
+		new InformationContents4System().calculateIC();
+		new InformationContentsInInheritance().calculateIC();
+	}
+	
+	private static void printClassSimilarity(){
+		new ArchitectureBasedDS(); 
+		new InheritanceBasedDS();
+		new ClassCouplingBasedDS();
+		
+		HashMap<String, String> classes = ProjectAnalyzer.project.getClassesInSystem();
+		HashSet<String> t = new HashSet<String>();
+		ArrayList<String> list = new ArrayList<String>();
+		
+		for(String key1: classes.keySet()){
+			for(String key2: classes.keySet()){
+				if(key1!=key2 && !t.contains(key1 + ":" + key2)){
+					t.add(key1 + ":" + key2);
+					t.add(key2 + ":" + key1);
+					MyClass c1 = ProjectAnalyzer.project.getClass(key1);
+					MyClass c2 = ProjectAnalyzer.project.getClass(key2);
+					if(c1!=null && c2!=null && !c1.isInterface() && !c2.isInterface()){
+						double ar = ArchitectureBasedDS.dsTable.get(key1 + ":" + key2);
+						double inh = InheritanceBasedDS.dsTable.get(key1 + ":" + key2);
+						double cou = ClassCouplingBasedDS.dsTable.get(key1 + ":" + key2);
+						list.add(key1 + ":" + key2 + ":" + ar + ":" + inh + ":" + cou);
+						System.out.println(key1 + ":" + key2 + ":" + ar + ":" + inh + ":" + cou);
+					}
+				}
+			}
+		}
+		
+		Logger2File.print2CSVFile(list, "DS");
+		
+	}
+	
+	private static void getEntities(Repo iRepo, IPackageFragment[] packages)
+			throws JavaModelException {
+		
+		for (IPackageFragment mypackage : packages) {
+			
+			if (mypackage.getKind() == IPackageFragmentRoot.K_SOURCE//){
+				&& isTarget(mypackage)) {
+				
+				for (ICompilationUnit unit : mypackage.getCompilationUnits()) {
+					// Now create the AST for the ICompilationUnits
+					CompilationUnit parser = parse(unit);
+					
+					AbstractTypeDeclarationVisitor typeVisitor = new AbstractTypeDeclarationVisitor();
+					
+					parser.accept(typeVisitor);
+					
+					ArrayList<TypeDeclaration> classType = typeVisitor.getTypes();
+					
+					MyPackage pack = iRepo.getPackage(mypackage.getElementName());
+	
+					for (TypeDeclaration typeDeclaration : classType) {
+						
+						try {
+							
+							iRepo.makeClassNode(pack, typeDeclaration, parser, mypackage);
+						}
+						catch (Exception e) {
+							
+							System.out.println("packages [" + mypackage.getElementName() + "." + mypackage.getKind() + "]");
+							System.out.println("Class [" + unit.getElementName() + "]");
+							
+							e.printStackTrace();
+						}
+					}
+					
+					for (EnumDeclaration enumDeclaration : typeVisitor.getEnums()) {
+						
+						try {
+							
+							iRepo.makeEnumNode(iRepo, pack, enumDeclaration, mypackage);
+						}
+						catch (Exception e) {
+							
+							System.out.println("packages [" + mypackage.getElementName() + "." + mypackage.getKind() + "]");
+							System.out.println("Enum [" + unit.getElementName() + "]");
+							
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	private static void makeInheritance(){
+		String deg="";
+		MyClass virtualNode=null;
+		if(ProjectAnalyzer.project.getClassList().containsKey("ROOT")){
+			virtualNode = ProjectAnalyzer.project.getClass("ROOT");
+		}else{
+			virtualNode = new MyClass("ROOT", true);
+			ProjectAnalyzer.project.getClassList().put("ROOT", virtualNode);
+		}
+		if(!ProjectAnalyzer.project.getClassList().containsKey("java.lang.Object"))
+			ProjectAnalyzer.project.getClassList().put("java.lang.Object", new MyClass("java.lang.Object", true));
+		
+		for(String key: ProjectAnalyzer.project.getClassList().keySet()){
+			MyClass c = ProjectAnalyzer.project.getClassList().get(key);
+			
+			if(!c.isEnumuration()) {
+				try{
+					deg = c.getID();
+					if(c.getDeclaration() != null && c.getDeclaration().resolveBinding().getSuperclass()!=null && !c.isInterface()){
+						ITypeBinding itb = c.getDeclaration().resolveBinding().getSuperclass();
+						MyClass superClass = ProjectAnalyzer.project.getClassList().get(itb.getQualifiedName());
+						if(superClass==null || !ProjectAnalyzer.project.getClassList().containsKey(superClass.getID()))
+							superClass = ProjectAnalyzer.project.getClassList().get("java.lang.Object");
+						c.setSuperClass(superClass);
+						superClass.addChildClasses(c);
+						
+						ITypeBinding[] its = c.getDeclaration().resolveBinding().getTypeDeclaration().getInterfaces();
+						
+						for(ITypeBinding t: its){
+							MyClass itfc = ProjectAnalyzer.project.getClass(t.getQualifiedName());
+							if(itfc!=null){
+								c.addInterface(itfc);
+								itfc.addImplementedClasses(c);
+							}
+						}
+					}else{
+						if(!c.getID().equals("ROOT")){
+							c.setSuperClass(virtualNode);
+							virtualNode.addImplementedClasses(c);
+						}
+					}
+
+				}catch(NullPointerException e){
+//					System.out.println("Null Pointer Exception in Project Analyuzer" + " : " + deg);
+				}
+			
+			}
+		}
+		
+		virtualNode.addChildClasses(ProjectAnalyzer.project.getClass("java.lang.Object"));
+		
+		ProjectAnalyzer.project.getClass("java.lang.Object").setSuperClass(virtualNode);
+	}
+	
+
+	private static void makeFanout() {
+		ArrayList<MyMethod> add = new ArrayList<MyMethod>();
+		for(String key:ProjectAnalyzer.project.getMethodList().keySet()){
+			MyMethod m = ProjectAnalyzer.project.getMethodList().get(key);
+			add.addAll(ProjectAnalyzer.project.makeFanOutList(ProjectAnalyzer.project, m, m.getMd()));
+		}
+		
+		for(MyMethod m: add){
+			ProjectAnalyzer.project.getMethodList().put(m.getID(), m);
+		}
+	}
+	
+	private static void makeFanin() {
+		MyClass associatedClass = null;
+		for (MyMethod md : ProjectAnalyzer.project.getMethodList().values()) {
+			for (MyMethod fanOutMethod : md.getFanOut()) {
+				if(fanOutMethod != null) {
+					fanOutMethod.addFanInMethod(md);
+					associatedClass = md.getParent();
+					fanOutMethod.getParent().addUsedClasses(associatedClass);
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Reads a ICompilationUnit and creates the AST DOM for manipulating the
+	 * Java source file
+	 *
+	 * @param unit
+	 * @return
+	 */
+	private static CompilationUnit parse(ICompilationUnit unit) {
+		ASTParser parser = ASTParser.newParser(AST.JLS4);
+		parser.setKind(ASTParser.K_COMPILATION_UNIT);
+		parser.setSource(unit);
+		parser.setResolveBindings(true);
+		parser.setStatementsRecovery(true);
+		parser.setBindingsRecovery(true);
+		
+		return (CompilationUnit) parser.createAST(null); // parse
+	}
+	
+	
+	private static boolean hasInternalRefer(MyClass c){
+		ArrayList<MyMethod> methods = c.getOwnedMethods();
+		
+		for(MyMethod m: methods){
+			ArrayList<MyField> out = m.getReferencedField();
+			for(MyField o: out){
+				if(o.getParent().getID().equals(c.getID())){
+					return true;
+				}
+			}
+		}
+		
+		return false;
+	}
+	
+	
+
+	private static boolean hasInternalCallAndRefer(MyClass c){
+		ArrayList<MyMethod> methods = c.getOwnedMethods();
+		boolean flg = false;
+		
+		for(MyMethod m: methods){
+			ArrayList<MyMethod> out = m.getFanOut();
+			for(MyMethod o: out){
+				if(o.getParent().getID().equals(c.getID())){
+					flg = true;
+				}
+			}
+		}
+		
+		if(!flg){
+			for(MyMethod m: methods){
+				if(m.getReferencedField().size()>0){
+					flg=true;
+				}
+			}	
+		}
+		
+		return flg;
+	}
+	
+
+	private static boolean hasInternalCall(MyClass c){
+		ArrayList<MyMethod> methods = c.getOwnedMethods();
+		
+		for(MyMethod m: methods){
+			ArrayList<MyMethod> out = m.getFanOut();
+			for(MyMethod o: out){
+				if(o.getParent().getID().equals(c.getID())){
+					return true;
+				}
+			}
+		}
+		
+		return false;
+	}
+	
+	
+}

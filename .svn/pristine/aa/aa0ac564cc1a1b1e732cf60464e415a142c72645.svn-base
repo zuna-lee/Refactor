@@ -1,0 +1,124 @@
+package zuna.util;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+
+import zuna.Repository.RMGRepo;
+import zuna.model.MyClass;
+import zuna.model.MyField;
+import zuna.model.MyMethod;
+import zuna.model.MyPackage;
+import zuna.model.Repo;
+import zuna.refactoring.ProjectAnalyzer;
+
+public class Logger2Console {
+	public static void checkChildOfClasses() {
+		for(String key: ProjectAnalyzer.project.getClassList().keySet()){
+			MyClass c = ProjectAnalyzer.project.getClassList().get(key);
+			if(!c.isLibrary()){
+				System.out.println("parent:"+c.getID());
+				for(MyClass it: c.getChildClasses()){
+					System.out.println("            child:"+it.getID());
+				}
+			}	
+		}
+	}
+	
+	public static void checkPropertiesOfClasses() {
+		for(String key: ProjectAnalyzer.project.getClassList().keySet()){
+			
+			MyClass c = ProjectAnalyzer.project.getClassList().get(key);
+			if(c.getID().equals("org.gjt.sp.jedit.textarea.ShapedFoldPainter")){
+				ArrayList<MyField> fs = c.getOwendField();
+				ArrayList<MyMethod> ms = c.getOwnedMethods();
+				
+				System.out.println("Field List");
+				for(MyField f: fs){
+					System.out.println(f.getID());
+				}
+				
+				System.out.println("Method List");
+				for(MyMethod m: ms){
+					System.out.println("====="+m.getID());
+					ArrayList<MyMethod> outs = m.getFanOut();
+					System.out.println("    Fan-Out List");
+					for(MyMethod o: outs){
+						System.out.println("  " + o.getID());
+					}
+					
+					ArrayList<MyMethod> ins = m.getFanOut();
+					System.out.println("    Fan-In List");
+					for(MyMethod i: ins){
+						System.out.println("  " + i.getID());
+					}
+					
+					ArrayList<MyField> ref = m.getReferencedField();
+					System.out.println("    Ref List");
+					for(MyField r: ref){
+						System.out.println("  " + r.getID());
+					}
+				}
+				
+				
+			}
+		}
+	}
+
+	public static void CMGCheck() {
+		int ccCount = 0;
+		
+		for(String key: RMGRepo.componentOfClasses.keySet()){
+			ccCount += RMGRepo.componentOfClasses.get(key).getComponents().size();
+		}
+		System.out.println(ccCount);
+	}
+	
+	public static void printFanouts(MyClass c){
+
+		ArrayList<MyMethod> mlist = c.getOwnedMethods();
+		
+		for(MyMethod m: mlist){
+			ArrayList<MyMethod> out = m.getFanOut();
+			for(MyMethod o: out){
+				System.out.println(m.getID() + ":" + o.getID());
+			}
+		}
+	}
+	
+	private static void displayElementList(Repo project) {
+		System.out.println("==================================================");
+		System.out.println("Project Name : " + project.getName());
+		
+		System.out.println("Total package number : " + project.getPackageList().size());
+		System.out.println("Total class number : " + project.getClassList().size());
+		System.out.println("Total method number : " + project.getMethodList().size());
+		System.out.println("Total field number : " + project.getFieldList().size());
+		
+		for(String pkey: ProjectAnalyzer.project.getPackageList().keySet()){
+			MyPackage p = ProjectAnalyzer.project.getPackageList().get(pkey);
+			System.out.println(p.getID());
+			HashMap<String, MyClass> classes = p.getClassChildren();
+			for(String ckey: classes.keySet()){
+				MyClass c = ProjectAnalyzer.project.getClassList().get(ckey);
+				System.out.print("             " + c.getID());
+				if(c.getSuperClass()!=null) System.out.println("///////////////" + c.getSuperClass().getID());
+				else System.out.println();
+				for(MyMethod m: c.getOwnedMethods()){
+					System.out.println("                  " + m.getID() + "=====" + m.getFanOut().size() + "+++++++++" + m.getReferencedField().size() + "+++++++++" + m.getFanIn().size());
+				}
+				
+				for(MyField f: c.getOwendField()){
+					System.out.println("                  " + f.getID());
+				}
+			}
+			
+		}
+	}
+	
+	public static void dispMethods(ArrayList<MyMethod> methods){
+		for(MyMethod m: methods){
+			System.out.println(m.getID());
+		}
+	}
+	
+}

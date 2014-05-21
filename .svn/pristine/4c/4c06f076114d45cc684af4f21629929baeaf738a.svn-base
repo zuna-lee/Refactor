@@ -1,0 +1,163 @@
+package zuna.refactoring.experiment;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Vector;
+
+import zuna.model.MyClass;
+import zuna.model.MyField;
+import zuna.model.MyMethod;
+import zuna.refactoring.ProjectAnalyzer;
+
+public class ClassMutation {
+
+	private MyClass c1, c2;
+	
+	public MyClass getC1() {
+		return c1;
+	}
+
+	public MyClass getC2() {
+		return c2;
+	}
+
+	public ClassMutation(MyClass c1, MyClass c2){
+		try {
+			this.c1 = (MyClass)c1.clone();
+			this.c2 = (MyClass)c2.clone();
+		} catch (CloneNotSupportedException e) {
+			e.printStackTrace();
+		}
+		
+		ArrayList<MyMethod> remove = new ArrayList<MyMethod>();
+		
+		for(int i = 0 ; i < this.c1.getOwnedMethods().size() ; i++){
+			MyMethod m = this.c1.getOwnedMethods().get(i);
+			if(!(m.getMd().isConstructor() || m.isSupport() || m.isLibrary() || m.getStatementCnt()<=1 || this.isObjMethods(m))) 
+				remove.add(m);
+		}
+
+		this.c1.setOwnedMethods(remove);
+		
+
+		ArrayList<MyMethod> remove2 = new ArrayList<MyMethod>();
+		
+		for(int i = 0 ; i < this.c2.getOwnedMethods().size() ; i++){
+			MyMethod m = this.c2.getOwnedMethods().get(i);
+			if(!(m.getMd().isConstructor() || m.isSupport() || m.isLibrary() || m.getStatementCnt()<=1 || this.isObjMethods(m))) 
+				remove2.add(m);
+		}
+
+		this.c2.setOwnedMethods(remove2);
+		
+	}
+	
+	private boolean isObjMethods(MyMethod m){
+		MyClass objClass = ProjectAnalyzer.project.getClass("java.lang.Object");
+		ArrayList<MyMethod> objMethod = objClass.getOwnedMethods();
+		for(MyMethod obj: objMethod){
+			if(m.getID().endsWith(obj.getID())) return true;
+		}
+		
+		return false;
+	}
+	
+	public ArrayList<MyMethod> getMethodsOfC1(){
+		return this.c1.getOwnedMethods();
+	}
+	
+	public ArrayList<MyMethod> getMethodsOfC2(){
+		return this.c2.getOwnedMethods();
+	}
+	
+	public ArrayList<MyField> getFieldOfC1(){
+		return this.c1.getOwendField();
+	}
+	
+
+	public ArrayList<MyField> getFieldOfC2(){
+		return this.c2.getOwendField();
+	}
+	
+	public MyClass merge(){
+		MyClass c = null;
+		try {
+			c = (MyClass)c2.clone();			
+			ArrayList<MyMethod> methodsOfc1 = c1.getOwnedMethods();
+			ArrayList<MyField> fieldsOfc1 = c1.getOwendField();
+			c.getOwnedMethods().addAll(methodsOfc1);
+			c.getOwendField().addAll(fieldsOfc1);
+			
+		} catch (CloneNotSupportedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return c;
+	}
+
+	private Integer[] matchedElements(Vector<String> methods1, Vector<String> methods2){
+		
+		Integer[] matched = new Integer[4];
+		
+		int n11 = getMatchedNumber(methods1, this.getMethodsOfC1());
+		int n12 = getMatchedNumber(methods1, this.getMethodsOfC2());
+		int n21 = getMatchedNumber(methods2, this.getMethodsOfC1());
+		int n22 = getMatchedNumber(methods2, this.getMethodsOfC2());
+		
+		if(n11+n22>n12+n21){
+			matched[0] = new Integer(n11);
+			matched[1] = new Integer(n22);
+			matched[2] = new Integer(0);
+			matched[3] = new Integer(1);
+		}else{
+			matched[0] = new Integer(n12);
+			matched[1] = new Integer(n21);
+			matched[2] = new Integer(1);
+			matched[3] = new Integer(0);
+		}
+		
+		
+		return matched;
+	}
+
+	private int getMatchedNumber(Vector<String> methods, ArrayList<MyMethod> cluster) {
+		
+		int n = 0;
+		for(String m1: methods){
+			for(MyMethod m2: cluster){
+				if(m1.equals(m2.getID())){
+					n++;
+				}
+			}
+		}
+		return n;
+	}
+	
+	public double getFmeasure(Vector<String> cluster1, Vector<String> cluster2){
+		Integer[] matched = this.matchedElements(cluster1, cluster2);
+		
+		if(matched[2]==0){
+			double p1 = (double)matched[0]/(double)cluster1.size();
+			double r1 = (double)matched[0]/(double)this.getMethodsOfC1().size();
+			
+			double p2 = (double)matched[1]/(double)cluster2.size();
+			double r2 = (double)matched[1]/(double)this.getMethodsOfC2().size();
+			double p = (p1 + p2)/2;
+			double r = (r1 + r2)/2;
+			if(Double.isNaN(p) || Double.isNaN(r)|| Double.isInfinite(p)|| Double.isInfinite(r) || (p+r)==0) return 0;
+			else return (p*r*2)/(p+r);
+		}else{
+			double p1 = (double)matched[0]/(double)cluster1.size();
+			double r1 = (double)matched[0]/(double)this.getMethodsOfC2().size();
+			
+			double p2 = (double)matched[1]/(double)cluster2.size();
+			double r2 = (double)matched[1]/(double)this.getMethodsOfC1().size();
+			double p = (p1 + p2)/2;
+			double r = (r1 + r2)/2;
+			if(Double.isNaN(p) || Double.isNaN(r)|| Double.isInfinite(p)|| Double.isInfinite(r) || (p+r)==0) return 0;
+			else return (p*r*2)/(p+r);
+		}
+	}
+	
+}

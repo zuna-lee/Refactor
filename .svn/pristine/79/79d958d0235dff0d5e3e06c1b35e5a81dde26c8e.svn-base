@@ -1,0 +1,418 @@
+package zuna.refactoring.operator.code.modifiers;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Iterator;
+
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTParser;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.NullLiteral;
+import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.VariableDeclarationExpression;
+import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
+import org.eclipse.jface.text.BadLocationException;
+import org.eclipse.jface.text.Document;
+import org.eclipse.text.edits.MalformedTreeException;
+import org.eclipse.text.edits.TextEdit;
+
+import zuna.model.MyClass;
+import zuna.model.MyField;
+import zuna.model.MyMethod;
+import zuna.refactoring.ProjectAnalyzer;
+
+public class CodeModifier {
+	
+ 	protected ICompilationUnit unit;
+ 	protected AST astTarget;
+ 	protected ASTRewrite rewriter;
+ 	protected MethodDeclaration md;
+ 	protected CompilationUnit cu;
+ 	protected TypeDeclaration typeDecl;
+ 	protected VariableDeclarationExpression exp;
+	protected static boolean accessToOldCass;
+	
+ 	protected  void init(MyClass c){
+		try {
+			
+			IPackageFragment[] packages = JavaCore.create(ProjectAnalyzer.iproject).getPackageFragments();
+			
+			IPackageFragment package1 = null;
+			for (IPackageFragment mypackage : packages) {
+				if(mypackage.getElementName().equals(c.getParent().getID())){
+					package1 = mypackage;
+					break;
+				}
+			}
+
+			unit = package1.getCompilationUnit(getICompilationUnitName(c));
+		 	cu = parse(unit); 
+		 	astTarget = cu.getAST();
+			rewriter = ASTRewrite.create(astTarget);
+			Iterator iter = cu.types().iterator();
+			while(iter.hasNext()){
+				TypeDeclaration type = (TypeDeclaration) iter.next();
+				if(type.getName().toString().equals(getTypeName(c))){
+					typeDecl = type;
+					break;
+				}
+			}	
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private  String getICompilationUnitName(MyClass c) {
+		String[] sourceFileTmp = c.getID().split("\\.");
+	 	String sourceClassName = sourceFileTmp[sourceFileTmp.length-1];
+	 	String sourceFileName = sourceClassName + ".java";
+		return sourceFileName;
+	}
+	
+ 	
+	protected void save() {
+		try {
+			TextEdit edits = rewriter.rewriteAST();
+			Document document = new Document(unit.getSource());
+			edits.apply(document);
+			// this is the code for adding statements
+			unit.getBuffer().setContents(document.get());
+			unit.commitWorkingCopy(false, null);
+		} catch (JavaModelException | MalformedTreeException | BadLocationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	protected void init(MyMethod oldMethod){
+		
+		String[] tokens = oldMethod.getParent().getID().split("\\.");
+		String fileName = tokens[tokens.length-1] + ".java";
+		
+		try {
+			IPackageFragment[] packages = JavaCore.create(ProjectAnalyzer.iproject).getPackageFragments();
+			IPackageFragment package1 = getPackageFragment(oldMethod, packages);
+			unit = package1.getCompilationUnit(fileName);
+			cu = parse(unit); 
+			Iterator iter = cu.types().iterator();
+			setMethodDeclaration(oldMethod, iter);
+			
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+
+	private  CompilationUnit parse(ICompilationUnit unit) {
+		ASTParser parser = ASTParser.newParser(AST.JLS4);
+		parser.setKind(ASTParser.K_COMPILATION_UNIT);
+		parser.setSource(unit);
+		parser.setResolveBindings(true);
+		parser.setStatementsRecovery(true);
+		parser.setBindingsRecovery(true);
+		
+		return (CompilationUnit) parser.createAST(null); // parse
+	}
+	
+	protected String getTypeName(MyClass c) {
+		String[] sourceFileTmp = c.getID().split("\\.");
+	 	String sourceClassName = sourceFileTmp[sourceFileTmp.length-1];
+		return sourceClassName;
+	}
+	
+	
+	private IPackageFragment getPackageFragment(MyMethod oldMethod, IPackageFragment[] packages) {
+		
+		IPackageFragment package1 = null;
+		for (IPackageFragment mypackage : packages) {
+			if(mypackage.getElementName().equals(oldMethod.getParent().getParent().getID())){
+				package1 = mypackage;
+				break;
+			}
+		}
+		return package1;
+	}
+
+	private void setMethodDeclaration(MyMethod oldMethod, Iterator iter) {
+		while(iter.hasNext()){
+			TypeDeclaration type = (TypeDeclaration) iter.next();
+			if(type.getName().toString().equals(getTypeName(oldMethod.getParent()))){
+				MethodDeclaration[] mds = type.getMethods();
+				for(int i = 0 ; i < mds.length ; i++){
+					if(isMatched(mds[i], oldMethod.getMd())){
+						this.md = mds[i];
+						astTarget = mds[i].getAST();
+						rewriter = ASTRewrite.create(astTarget);
+						break;
+					}
+				}
+			}	
+		}
+	}
+	
+
+	public boolean isMatched(MethodDeclaration md1, MethodDeclaration md2){
+		String n1 = getFullName(md1);
+		String n2 = getFullName(md2);
+		return n1.equals(n2);
+	}
+	
+	public boolean isMatched(MethodDeclaration md1, MethodInvocation md2){
+		String n1 = getFullName(md1);
+		String n2 = getFullName(md2);
+		return n1.equals(n2);
+	}
+	
+	public boolean isMatched(FieldDeclaration fd1, FieldDeclaration fd2){
+		String n1 = fd1.toString();
+		String n2 = fd2.toString();
+		return n1.equals(n2);
+	}
+	
+	protected String getFullName(MethodInvocation inv){
+		String name = inv.getName().getIdentifier();
+		name += "(";
+		Iterator iter = inv.arguments().iterator();
+		
+		int cnt = 0;
+		while(iter.hasNext()){
+			Object obj = iter.next();
+			if(obj instanceof Expression){
+				Expression ex = ((Expression) obj);
+				if(ex.resolveTypeBinding()!=null)
+				{
+					String typeName = ex.resolveTypeBinding().getName();
+					name += typeName + " ";
+				}
+				
+			}else if(obj instanceof NullLiteral){
+				name += "null" + " ";
+			}
+			
+		}
+		
+		name += ")";
+		
+		return name;
+	}
+	
+	
+	protected String getFullName(MethodDeclaration md){
+		String name = md.getName().getIdentifier();
+		name += "(";
+		Iterator iter = md.parameters().iterator();
+		
+		int cnt = 0;
+		while(iter.hasNext()){
+			Object obj = iter.next();
+			if(obj instanceof SingleVariableDeclaration){
+				SingleVariableDeclaration var = (SingleVariableDeclaration) obj;
+				String typeName = var.getType().toString();
+				String[] typeTemp = typeName.split("\\.");
+				typeName = typeTemp[typeTemp.length-1];
+				name += typeName + " ";
+			}
+		}
+		
+		name += ")";
+		
+		return name;
+	}
+	
+
+	protected String getFullName(MyMethod m){
+		String[] tmp = m.getID().split("\\.");
+		return tmp[tmp.length-1];
+	}
+	protected boolean isExtracted(ArrayList<MyMethod> extracted, MyMethod m){
+		for(MyMethod ext: extracted){
+			if(ext.getID().equals(m.getID())){
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+
+	protected boolean isExtracted(String name, ArrayList<MyMethod> extracted){
+		for(MyMethod m: extracted){
+			if(m.getMd().getName().getIdentifier().equals(name)){
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	protected MethodDeclaration getMD(MyMethod oldMethod){
+		String[] tokens = oldMethod.getParent().getID().split("\\.");
+		String fileName = tokens[tokens.length-1] + ".java";
+		
+		try {
+			IPackageFragment[] packages = JavaCore.create(ProjectAnalyzer.iproject).getPackageFragments();
+			
+			IPackageFragment package1 = null;
+			for (IPackageFragment mypackage : packages) {
+				if(mypackage.getElementName().equals(oldMethod.getParent().getParent().getID())){
+					package1 = mypackage;
+					break;
+				}
+			}
+			
+			unit = package1.getCompilationUnit(fileName);
+			cu = this.parse(unit); 
+		 	astTarget = cu.getAST();
+			Iterator iter = cu.types().iterator();
+			
+			while(iter.hasNext()){
+				TypeDeclaration type = (TypeDeclaration) iter.next();
+				if(type.getName().toString().equals(getTypeName(oldMethod.getParent()))){
+					MethodDeclaration[] mds = type.getMethods();
+					for(int i = 0 ; i < mds.length ; i++){
+						if(isMatched(mds[i], oldMethod.getMd())){
+							return mds[i];
+						}
+					}
+				}	
+			}
+			
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+	
+	protected MethodDeclaration getMD(MethodInvocation inv, MyClass oldClass){
+		
+		String[] tokens = oldClass.getID().split("\\.");
+		String fileName = tokens[tokens.length-1] + ".java";
+
+		try {
+			IPackageFragment[] packages = JavaCore.create(ProjectAnalyzer.iproject).getPackageFragments();
+			
+			IPackageFragment package1 = null;
+			for (IPackageFragment mypackage : packages) {
+				if(mypackage.getElementName().equals(oldClass.getParent().getID())){
+					package1 = mypackage;
+					break;
+				}
+			}
+			
+			unit = package1.getCompilationUnit(fileName);
+			cu = this.parse(unit); 
+		 	astTarget = cu.getAST();
+			Iterator iter = cu.types().iterator();
+			
+			while(iter.hasNext()){
+				TypeDeclaration type = (TypeDeclaration) iter.next();
+				if(type.getName().toString().equals(getTypeName(oldClass))){
+					MethodDeclaration[] mds = type.getMethods();
+					for(int i = 0 ; i < mds.length ; i++){
+						if(isMatched(mds[i], inv)){
+							return mds[i];
+						}
+					}
+				}	
+			}
+			
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+	
+	protected void save(String name, IPackageFragment ipackage, String cont)
+			throws JavaModelException {
+		ICompilationUnit icu = ipackage.createCompilationUnit(name, cont, true, null);
+		icu.reconcile(ICompilationUnit.NO_AST, false, null, null);
+		icu.commitWorkingCopy(false, null);
+		icu.discardWorkingCopy();
+	}
+	
+	protected boolean containReferencesToOldClass(final MethodDeclaration md, 
+			final ArrayList<MyMethod> notExtracted, 
+			final ArrayList<MyMethod> extracted, 
+			final ArrayList<MyField> fields, 
+			final Hashtable<String, MyField> notShareAttribute,
+			final MyClass oldClass) {
+		
+		accessToOldCass = false;
+		md.accept(new ASTVisitor(){
+			@Override
+			public boolean visit(SimpleName sn){
+				
+				if(isField(sn)){
+					accessToOldCass = true;
+				}
+				
+				if(this.isInvcation(sn)){
+					accessToOldCass = true;
+				}
+				
+				return true;
+			}
+			
+			private boolean isInvcation(SimpleName sn){
+				
+				if(sn.getParent() instanceof MethodInvocation){
+					MethodInvocation inv = (MethodInvocation) sn.getParent();
+					for(MyMethod nExtracted: notExtracted){
+						if(!isExtracted(extracted, nExtracted)){
+							if(getFullName(inv).equals(getFullName(nExtracted))){
+								return true;
+							}
+						}
+					}
+				}
+				
+				return false;
+			}
+			private boolean isField(SimpleName sn){
+				
+				for(MyField f: fields){
+					String[] tokens = f.getID().split("\\.");
+					String fName = tokens[tokens.length-1];
+					if(sn.getIdentifier().equals(fName) && 
+							!this.isNotShared(sn))
+					{
+						return true;
+					}
+				}
+				return false;
+			}
+			
+			private boolean isNotShared(SimpleName sn){
+				for(String key: notShareAttribute.keySet()){
+					String[] tmp = key.split("\\.");
+					String name = tmp[tmp.length-1];
+					if(name.equals(sn.getIdentifier())){
+						return true;
+					}
+				}
+				return false;
+			}
+			
+		});
+		
+		return accessToOldCass;
+	}
+	
+}

@@ -1,0 +1,31 @@
+package zuna.refactoring.codeChanger;
+
+import java.util.HashSet;
+
+import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaModelException;
+
+public class FieldChanger {
+
+	private String fieldType;
+	private String fieldIdentifier;
+	
+	public String makeNewField(IType targetType, IMethod newMethod, HashSet<IType> callerClasses){
+		try {
+			for(IType type: callerClasses){
+				type.createField(getFieldDecl(targetType), null, false, new NullProgressMonitor());
+			}
+			
+		} catch (JavaModelException e) {
+		}
+		return this.fieldIdentifier;
+	}
+	
+	private String getFieldDecl(IType newClass){
+		fieldType = newClass.getElementName();
+		fieldIdentifier = fieldType.toLowerCase();
+		return "private " + fieldType + " " + fieldIdentifier + " = new " + fieldType + "();"; 
+	}
+}

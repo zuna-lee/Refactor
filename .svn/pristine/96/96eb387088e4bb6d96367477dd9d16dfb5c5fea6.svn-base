@@ -1,0 +1,29 @@
+package zuna.refactoring.codeChanger;
+
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IField;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.internal.corext.codemanipulation.GetterSetterUtil;
+
+
+@SuppressWarnings("restriction")
+public class GetterSetterGenerator {
+	
+	public void generate(ICompilationUnit cu, IField[] field){
+		
+		try {
+			for(int i = 0 ; i < field.length ; i++){
+				IMethod getter = GetterSetterUtil.getGetter(field[i]);
+				IMethod setter = GetterSetterUtil.getSetter(field[i]);
+				System.out.println(getter.getSource());
+				System.out.println(setter.getSource());
+			}
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+
+}

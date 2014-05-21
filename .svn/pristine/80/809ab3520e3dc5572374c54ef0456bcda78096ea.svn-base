@@ -1,0 +1,40 @@
+package zuna.refactoring.ui.views;
+
+public class ClassMetric {
+	private double ncom = 0.0;
+	private double cerm = 0.0;
+	private double intensity = 0.0;
+	private double chance = 0.0;
+	public ClassMetric(double ncom, double cerm, double intensity, double chance) {
+		this.ncom = ncom;
+		this.cerm = cerm;
+		this.intensity = intensity;
+		this.chance = chance;
+	}
+	public double getNcom() {
+		return ncom;
+	}
+	public void setNcom(double ncom) {
+		this.ncom = ncom;
+	}
+	public double getCerm() {
+		return cerm;
+	}
+	public void setCerm(double cerm) {
+		this.cerm = cerm;
+	}
+	public double getIntensity() {
+		return intensity;
+	}
+	public void setIntensity(double intensity) {
+		this.intensity = intensity;
+	}
+	public double getChance() {
+		return chance;
+	}
+	public void setChance(double chance) {
+		this.chance = chance;
+	}
+	
+	
+}

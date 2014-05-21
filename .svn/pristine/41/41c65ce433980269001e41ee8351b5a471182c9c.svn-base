@@ -1,0 +1,111 @@
+package zuna.clustering.GA;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+
+import org.jgap.FitnessFunction;
+import org.jgap.Gene;
+import org.jgap.IChromosome;
+
+public class MQFitnessFunction extends FitnessFunction {
+
+	private static final long serialVersionUID = 1L;
+	private Hashtable<String, Double> similarityTable = new Hashtable<String, Double>();
+	private Hashtable<Integer, String> geneVSMethodTable = new Hashtable<Integer, String>();
+	public MQFitnessFunction(Hashtable<String, Double> similarityTable, Hashtable<Integer, String> geneVSMethodTable) {
+		super();
+		this.similarityTable = similarityTable;
+		this.geneVSMethodTable = geneVSMethodTable;
+	}
+
+	@Override
+	protected double evaluate(IChromosome ch) {
+		if(!this.isClustered(ch)){
+			return 0;
+		}
+		Hashtable<String, ArrayList<String>> clusters = this.getCluster(ch.getGenes());
+		return this.getMQ(clusters);
+	}
+	
+	private boolean isClustered(IChromosome ch){
+		Gene[] genes = ch.getGenes();
+		int chk = 0;
+		for(int i =  0 ; i < genes.length ; i++){
+			chk+=Integer.valueOf(genes[i].getAllele().toString());
+		}
+		
+		if(chk<1 || chk >= genes.length-1){
+			return false;
+		}else{
+			return true;
+		}
+	}
+	private double getMQ(Hashtable<String, ArrayList<String>> clusters){
+		double mq = 0.0;
+		double cnt=0;
+		for(String key: clusters.keySet()){
+			ArrayList<String> cluster = clusters.get(key);
+			mq += this.getMQ(cluster);
+			cnt++;
+		}
+		
+		if(cnt>0){
+			return mq/cnt;
+		}else{
+			return 0;
+		}
+	}
+	
+	private double getMQ(ArrayList<String> cluster){
+		double mq = 0;
+		double cnt = 0;
+		
+		for(int i = 0 ; i < cluster.size()-1 ; i++){
+			for(int j = i+1 ; j < cluster.size() ; j++){
+				mq+=this.getSimilarity(cluster.get(i), cluster.get(j));
+				cnt++;
+			}
+			
+		}
+		
+		if(cnt>0){
+			return mq/cnt;
+		}else{
+			return 0;
+		}
+		
+	}
+	
+	private double getSimilarity(String m1, String m2){
+		double similarity = 0.0;
+		String m1id = getID(m1);
+		String m2id = getID(m2);
+		
+		if(this.similarityTable.containsKey(getKey(m1id, m2id))){
+			similarity = this.similarityTable.get(getKey(m1id, m2id));
+		}
+		
+		return similarity;
+	}
+	
+	private String getID(String gene){
+		return this.geneVSMethodTable.get(Integer.valueOf(gene));
+	}
+	
+	private Hashtable<String, ArrayList<String>> getCluster(Gene[] genes){
+		Hashtable<String, ArrayList<String>> clusters = new Hashtable<String, ArrayList<String>>();
+		for(int i = 0 ; i < genes.length;i++){
+			String key = genes[i].getAllele().toString();
+			if(!clusters.containsKey(key)){
+				clusters.put(key, new ArrayList<String>());
+			}
+			clusters.get(key).add(String.valueOf(i));
+		}
+		
+		return clusters;
+	}
+	
+	public static String getKey(String m1, String m2){
+		return m1 + ":" + m2;
+	}
+}

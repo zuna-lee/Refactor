@@ -1,0 +1,253 @@
+package zuna.refactoring.code;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IWorkspace;
+import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.Modifier.ModifierKeyword;
+import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
+import org.eclipse.jdt.core.dom.VariableDeclaration;
+import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
+
+import zuna.model.MyMethod;
+import zuna.model.MyParameter;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.ui.views.classDecomposesrViews.graph.ExtractionHelper;
+
+
+public class AccessModifierChanger extends ChangeRewrite {
+
+	public AccessModifierChanger(MyMethod m){
+		this.init(m);
+	}
+	
+	public IMethod getIMethod() throws JavaModelException{
+		setICompilationUnit(m);
+		cu.getSource();
+		setDocument();
+		classUnit = setCompilationUnit();
+		setMethodDecl(classUnit, m);
+		IMethod method = (IMethod) cu.getElementAt(md.getStartPosition());
+		return method;
+	}
+	
+	protected void init(MyMethod oldMethod) {
+		
+		try {
+			super.m = oldMethod;
+			setICompilationUnit(oldMethod);
+			setDocument();
+			classUnit = setCompilationUnit();
+			oldMethod.getParameters();
+			final IMethod method = getIMethod(oldMethod, classUnit);
+			setMethodDecl(classUnit, method);
+			rewrite = ASTRewrite.create(md.getParent().getAST());
+			
+			
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private IMethod getIMethod(MyMethod oldMethod, CompilationUnit classUnit) {
+		final IMethod method = classUnit.getTypeRoot().findPrimaryType().getMethod(oldMethod.getMd().getName().getIdentifier(), this.getParam(oldMethod.getMd()));
+		return method;
+	}
+
+	private void setICompilationUnit(MyMethod oldMethod)
+			throws JavaModelException {
+		String fileName = ExtractionHelper.getFileName(oldMethod.getParent());
+		IPackageFragment[] packages;
+		IWorkspace workspace = ResourcesPlugin.getWorkspace();
+		final IProject project = workspace.getRoot().getProject(ProjectAnalyzer.prjName);
+		packages = JavaCore.create(project).getPackageFragments();
+		IPackageFragment package1 = getPackageFragment(oldMethod, packages);
+		
+		cu = package1.getCompilationUnit(fileName);
+		try {
+			workingCopy = cu.getWorkingCopy(new NullProgressMonitor());
+		} catch (JavaModelException e) {
+			e.printStackTrace();
+		}
+		
+	}
+
+	protected void setMethodDecl(CompilationUnit classUnit, final IMethod method) {
+		classUnit.accept(new ASTVisitor() {
+
+		    @Override
+		    public boolean visit(final MethodDeclaration node) {
+		        String param[] = this.getParam(node);
+		        String param2[] = AccessModifierChanger.getParam(method.getParameterTypes());
+		        if(method.getElementName().equals(node.getName().getIdentifier()) && isSame(param, param2)){
+		        	md = node;
+		        }
+		        return true;
+		    }
+		    
+		    
+		    private String[] getParam(MethodDeclaration node){
+		    	String[] parameters = new String[node.parameters().size()];
+		        for (int i = 0 ; i < node.parameters().size() ; i ++) {
+		        	Object parameter = node.parameters().get(i);
+		            VariableDeclaration variableDeclaration = (VariableDeclaration) parameter;
+		            String type = variableDeclaration.getStructuralProperty(SingleVariableDeclaration.TYPE_PROPERTY)
+		                    .toString();
+		            for (int k = 0; k < variableDeclaration.getExtraDimensions(); k++) {
+		                type += "[]";
+		            }
+		            parameters[i] = type;
+		        }
+		        
+		        return parameters;
+		    }
+		    
+		    
+
+		});
+	}
+
+	private void setMethodDecl(CompilationUnit classUnit, final MyMethod method) {
+		classUnit.accept(new ASTVisitor() {
+
+		    @Override
+		    public boolean visit(final MethodDeclaration node) {
+		        String param[] = this.getParam(node);
+		        String param2[] = AccessModifierChanger.getParam(method.getParameters());
+		        if(method.getName().equals(node.getName().getIdentifier()) && isSame(param, param2)){
+		        	md = node;
+		        }
+		        return true;
+		    }
+		    
+		    
+		    private String[] getParam(MethodDeclaration node){
+		    	String[] parameters = new String[node.parameters().size()];
+		        for (int i = 0 ; i < node.parameters().size() ; i ++) {
+		        	Object parameter = node.parameters().get(i);
+		            VariableDeclaration variableDeclaration = (VariableDeclaration) parameter;
+		            String type = variableDeclaration.getStructuralProperty(SingleVariableDeclaration.TYPE_PROPERTY)
+		                    .toString();
+		            for (int k = 0; k < variableDeclaration.getExtraDimensions(); k++) {
+		                type += "[]";
+		            }
+		            parameters[i] = type;
+		        }
+		        
+		        return parameters;
+		    }
+		    
+		    
+
+		});
+	}
+
+	
+	private static boolean isSame(String[] param1, String[] param2){
+    	if(param1.length!=param2.length) return false;
+    	for(int i = 0 ; i < param1.length ; i++){
+    		if(!param1[i].trim().equals(param2[i].trim())){
+    			return false; 
+    		}
+    	}
+    	return true;
+    }
+	
+	private static String[] getParam(String[] types){
+    	String[] parameters = new String[types.length];
+    	for(int i = 0 ; i < types.length ; i++){
+    		parameters[i] = types[i].split(" ")[0];
+    	}
+    	
+    	return parameters;
+    }
+	
+	public static String[] getParam(ArrayList<MyParameter> types){
+    	String[] parameters = new String[types.size()];
+    	for(int i = 0 ; i < types.size() ; i++){
+    		parameters[i] = types.get(i).getType();
+    	}
+    	
+    	return parameters;
+    }
+	
+	private String[] getParam(MethodDeclaration md) {
+		String[] param = new String[md.parameters().size()];
+		for(int i = 0 ; i < md.parameters().size() ; i++){
+			if(!md.parameters().get(i).toString().endsWith("[]")){
+				param[i] = md.parameters().get(i).toString();
+			}else{
+				String t0 = md.parameters().get(i).toString().split(" ")[0];
+				String t1 = md.parameters().get(i).toString().split(" ")[1];
+				param[i] = t0 + t1.substring(t1.length()-2, t1.length()) +" " + t1.substring(0, t1.length()-2);
+			}
+		}
+		
+		return param;
+		
+	}
+	
+
+	private IPackageFragment getPackageFragment(MyMethod oldMethod, IPackageFragment[] packages) {
+		
+		IPackageFragment package1 = null;
+		for (IPackageFragment mypackage : packages) {
+			if(mypackage.getElementName().equals(oldMethod.getParent().getParent().getID())){
+				package1 = mypackage;
+				break;
+			}
+		}
+		return package1;
+		
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	protected void modify(){
+		
+		try {
+			MethodDeclaration newMd = md.getParent().getAST().newMethodDeclaration();
+			newMd = (MethodDeclaration)ASTNode.copySubtree(newMd.getAST(), md);
+			Iterator iter = newMd.modifiers().iterator();
+			while(iter.hasNext()){
+				Object obj = iter.next();
+				Modifier mod = (Modifier) obj;
+				if(mod.getKeyword().toString().equals("private")){
+					mod.delete();
+					newMd.modifiers().add(md.getParent().getAST().newModifier(ModifierKeyword.PUBLIC_KEYWORD));
+				}
+			}
+			rewrite.replace(md, newMd, null);
+			super.save();
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void changeProject() {
+		this.init(m);
+		super.m.setMd(super.md);
+		List<Modifier> newModifier = new ArrayList<Modifier>();
+		for(Object o: super.md.modifiers()){
+			newModifier.add((Modifier)o);
+		}
+		m.setModifier(newModifier);
+	}
+
+
+}

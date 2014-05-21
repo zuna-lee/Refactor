@@ -1,0 +1,74 @@
+package zuna.mining.hac.worldpeace;
+
+import java.util.ArrayList;
+import java.util.Vector;
+
+import zuna.mining.hac.HierarchicalAgglomerativeClusterer;
+import zuna.mining.hac.agglomeration.AgglomerationMethod;
+import zuna.mining.hac.agglomeration.AverageLinkage;
+import zuna.mining.hac.dendrogram.Dendrogram;
+import zuna.mining.hac.dendrogram.DendrogramBuilder;
+import zuna.mining.hac.dendrogram.ObservationNode;
+import zuna.mining.hac.experiment.DissimilarityMeasure;
+import zuna.mining.hac.experiment.Experiment;
+import zuna.model.MyParameter;
+
+public class ClusterTool {
+
+	public static Vector<ArrayList<MyParameter>> createSetOfCluters(ArrayList<MyParameter> parameters, double[][] matrix, AgglomerationMethod agglomerationMethod, double threshold, boolean dump) {
+
+		Experiment experiment = new MyExperiment(matrix);
+		
+		DissimilarityMeasure dissimilarityMeasure = new MyDissimilarityMeasure();
+
+		DendrogramBuilder dendrogramBuilder = new DendrogramBuilder(parameters);
+		
+		HierarchicalAgglomerativeClusterer clusterer = new HierarchicalAgglomerativeClusterer(experiment, dissimilarityMeasure, agglomerationMethod);
+		
+		clusterer.cluster(dendrogramBuilder);
+		
+		Dendrogram dendrogram = dendrogramBuilder.getDendrogram();
+		
+		if (dump) {
+			
+			dendrogram.dump();
+		}
+		
+		return dendrogram.getClusters(threshold);
+	}
+	
+	public static void main(String[] args) {
+		
+		ClusterTool clusterTool = new ClusterTool();
+		
+		double[][] matrix = {
+				{1, 0.1, 0.25, 0.2},
+				{0.25, 1, 0.3, 0.2},
+				{0.1, 0.3, 1, 0.4},
+				{0.2, 0.2, 0.4, 1},
+		};
+
+		ArrayList<MyParameter> parameters = new ArrayList<MyParameter>();
+		
+		parameters.add(new MyParameter(null, "", "a"));
+		parameters.add(new MyParameter(null, "", "b"));
+		parameters.add(new MyParameter(null, "", "c"));
+		parameters.add(new MyParameter(null, "", "d"));
+		
+		Vector<ArrayList<MyParameter>> setOfClusters = clusterTool.createSetOfCluters(parameters, matrix, new AverageLinkage(), 0.24, true);
+		
+		for (ArrayList<MyParameter> arrayList : setOfClusters) {
+			
+			System.out.print("cluster[" + setOfClusters.indexOf(arrayList) + "]");
+			System.out.print("\t");
+			
+			for (MyParameter parameter : arrayList) {
+				
+				System.out.print(parameter.toString());
+				System.out.print("\t");
+			}
+			
+			System.out.println();
+		}
+	}
+}

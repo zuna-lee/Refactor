@@ -1,0 +1,146 @@
+package zuna.refactoring.operator;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+
+import zuna.model.MyClass;
+import zuna.model.MyMethod;
+import zuna.parser.visitor.AbstractTypeDeclarationVisitor;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.code.AccessModifierChanger;
+import zuna.refactoring.code.Caller;
+import zuna.refactoring.code.ClassCreateChanger;
+import zuna.refactoring.code.FieldChanger;
+import zuna.refactoring.code.ImportChanger;
+import zuna.refactoring.code.InternalInvocationChanger;
+import zuna.refactoring.code.MethodMoveChanger;
+import zuna.refactoring.code.PointerChanger;
+import zuna.refactoring.ui.views.classDecomposesrViews.graph.ExtractionHelper;
+
+public class ExtractClass {
+	
+	private MyClass newClass;
+	
+	public MyClass createEmptyClass(MyClass oldClass, int idx){
+		String newFileName = ExtractionHelper.getFileName(oldClass, idx);
+		new ClassCreateChanger(newFileName, oldClass.getParent().getPf()).change();
+		ICompilationUnit iUnit = oldClass.getParent().getPf().getCompilationUnit(newFileName);
+		CompilationUnit unit = ExtractionHelper.parse(iUnit);
+		AbstractTypeDeclarationVisitor typeVisitor = new AbstractTypeDeclarationVisitor();
+		unit.accept(typeVisitor);
+		ArrayList<TypeDeclaration> classType = typeVisitor.getTypes();
+		TypeDeclaration td = classType.get(0);
+		String fullName = unit.getTypeRoot().findPrimaryType().getFullyQualifiedName();
+		this.newClass = new MyClass(fullName, td, unit, oldClass.getParent());
+		MyClass superClass = ProjectAnalyzer.project.getClass("java.lang.Object");
+		this.newClass.setSuperClass(superClass);
+		ProjectAnalyzer.project.getClassList().put(fullName, this.newClass);
+        return this.newClass;
+	}
+	
+	
+	public void moveMethods(ArrayList<MyMethod> movingMethods, MyClass source, MyClass target){
+		try {
+			ArrayList<MyMethod> notMoved = this.notMoved(movingMethods, source, target);
+			this.move(notMoved, movingMethods, source, target);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private ArrayList<MyMethod> notMoved(ArrayList<MyMethod> movingMethods, MyClass source, MyClass target){
+		ArrayList<MyMethod> notMoved = getNotMovedMethod(source.getOwnedMethods(), movingMethods);
+		for(MyMethod m: notMoved){
+			if(m!=null && hasBackCall(m, movingMethods)){
+				new AccessModifierChanger(m).change();
+			}
+		}
+		
+		return notMoved;
+	}
+	
+	private ArrayList<MyMethod> getNotMovedMethod(ArrayList<MyMethod> all, ArrayList<MyMethod> movingMethods){
+		Hashtable<String, String> table = new Hashtable<String, String>();
+		ArrayList<MyMethod> notMoved = new ArrayList<MyMethod>();
+		
+		for(MyMethod m: movingMethods){
+			if(m!=null){
+				table.put(m.getID(), m.getID());
+			}
+		}
+		
+		for(MyMethod m: all){
+			if(m!=null && !table.containsKey(m.getID())){
+				notMoved.add(m);
+			}
+		}
+		
+		return notMoved;
+	}
+	
+	private boolean hasBackCall(MyMethod notMoved, ArrayList<MyMethod> movingMethods){
+		for(MyMethod m: movingMethods){
+			if(m!=null){
+				ArrayList<MyMethod> out = m.getFanOut();
+				for(MyMethod o: out){
+					if(o!=null){
+						if(o.getID().equals(notMoved.getID())){
+							return true;
+						}
+					}
+				}
+			}
+			
+		}
+		return false;
+	}
+
+	private void move(ArrayList<MyMethod> notMoved, ArrayList<MyMethod> movingMethods, MyClass source, MyClass target)
+			throws JavaModelException {
+		for(MyMethod m: movingMethods){
+			if(m!=null){
+				IMethod targetMethod = (IMethod)m.getMd().resolveBinding().getJavaElement();
+				Caller caller = new Caller(targetMethod);
+				caller.getCallersOf(movingMethods);
+				
+				IType targetType = target.getCu().getTypeRoot().findPrimaryType();
+				
+				
+				AccessModifierChanger accessChanger = new AccessModifierChanger(m);
+				accessChanger.change();
+				IMethod movingIMethod = accessChanger.getIMethod();
+				
+				
+				System.out.println(m.getName() + " before: " + 
+						ProjectAnalyzer.project.getMethod(m.getID()).getParent().getID() + "---" + ProjectAnalyzer.project.getClass(source.getID()).getOwnedMethods().size()
+						);
+				new MethodMoveChanger(source, target, targetType, movingIMethod, m).change();
+				IMethod movedIMethod = targetType.getMethod(movingIMethod.getElementName(), movingIMethod.getParameterTypes());
+				System.out.println(m.getName() + " after: " + 
+						ProjectAnalyzer.project.getMethod(m.getID()).getParent().getID() + "---" + ProjectAnalyzer.project.getClass(source.getID()).getOwnedMethods().size()
+						);
+				
+				FieldChanger fieldChanger = new FieldChanger(targetType, caller.makeCallerClassSet());
+				fieldChanger.change();
+				String identifier = fieldChanger.getFieldIdentifier();
+				
+				
+				InternalInvocationChanger internalChanger = 
+						new InternalInvocationChanger(notMoved, source, movedIMethod, m, identifier);
+				internalChanger.change();
+				
+				
+				new PointerChanger(movedIMethod, caller.getCallerMethods(), identifier, internalChanger.isHasNewParam()).change();
+			}
+		}
+		
+		new ImportChanger().change(ProjectAnalyzer.iproject);
+	}
+}

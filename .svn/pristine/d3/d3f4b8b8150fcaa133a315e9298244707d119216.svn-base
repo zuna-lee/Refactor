@@ -1,0 +1,231 @@
+package zuna.metric.similarity;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Hashtable;
+import java.util.Vector;
+
+import zuna.metric.similarity.methodlevel.DM;
+import zuna.metric.similarity.methodlevel.EIC;
+import zuna.metric.similarity.methodlevel.IAS;
+import zuna.metric.similarity.methodlevel.IDC;
+import zuna.metric.similarity.methodlevel.IIC;
+import zuna.metric.similarity.methodlevel.IMS;
+import zuna.model.MyClass;
+import zuna.model.MyMethod;
+import zuna.model.Preprocessing;
+import zuna.refactoring.Metric;
+import zuna.refactoring.ProjectAnalyzer;
+
+public class MetricCalculator {
+
+	public static double wias = 0.0;
+	public static double widc = 0.0;
+	public static double wiic = 0.0;
+	public static double wims = 0.0;
+	public static double weic = 0.0;
+	public static double wecd = 0.0;
+	public MyClass c;
+	
+	public static double getEPMetric(MyMethod m1, MyMethod m2){
+		double metric = 0.0;
+		DM ep = new DM();
+		metric = ep.getMetric(m1, m2);
+		return 1 - metric;
+	}
+	
+	public static Metric getRSMetric(MyMethod m1, MyMethod m2){
+		
+		IAS ias = new IAS();
+		IDC idc = new IDC();
+		IMS ims = new IMS();
+		IIC iic = new IIC();
+		EIC eic = new EIC();
+		
+		
+		double iasValue = ias.getIAS(m1.getParent(), m1, m2);
+		double idcValue = idc.getIDC(m1, m2, true);
+		double imsValue = ims.getIMS(m1, m2);
+		double iicValue = iic.getMetric(m1, m2);
+		double eicValue = eic.getMetric(m1, m2);
+		
+		Metric metric = new Metric();
+		metric.setIas(iasValue);
+		metric.setIdc(idcValue);
+		metric.setIms(imsValue);
+		metric.setIic(iicValue);
+		metric.setEic(eicValue);
+		double rs = getRS(metric, m1.getParent());
+		metric.setRs(rs);
+		
+		String[] mName1 = m1.getID().split("\\.");
+		String[] mName2 = m2.getID().split("\\.");
+		ProjectAnalyzer.metrics.put(mName1[mName1.length-1] + "<->" + mName2[mName2.length-1], metric);
+
+		return metric;
+	}
+	
+	public MetricCalculator(MyClass c){
+		this.c = c;
+	}
+	
+	public static double getRS(Metric metric, MyClass c){
+		double rs = wias * (1 - metric.getIas()) + widc * (1 - metric.getIdc())  +  + wiic * (1 - metric.getIic()) +
+				wims * (1 - metric.getIms()) + weic * (1 - metric.getEic()) + wecd * (1 - metric.getEcd());
+		
+//		double rs = (1 - metric.getIas()) + (1 - metric.getIdc())  +  (1 - metric.getIic()) +
+//				(1 - metric.getIms()) + (1 - metric.getEic()) + (1 - metric.getEcd());
+		
+		return rs;
+	}
+	
+	public Vector<Double> getMetric(){
+		ProjectAnalyzer.metrics.clear();
+		new Preprocessing();
+		IAS ias = new IAS();
+		IDC idc = new IDC();
+		IMS ims = new IMS();
+		IIC iic = new IIC();
+		EIC eic = new EIC();
+		ArrayList<String> methods = ProjectAnalyzer.left;
+		methods.addAll(ProjectAnalyzer.right);
+		Vector<Double> rsVector = new Vector<Double>();
+		
+		for(String m1key: methods){
+			for(String m2key: methods){
+				MyMethod m1 = ProjectAnalyzer.project.getMethod(m1key);
+				MyMethod m2 = ProjectAnalyzer.project.getMethod(m2key);
+				
+				double iasValue = ias.getIAS(m1.getParent(), m1, m2);
+				double idcValue = idc.getIDC(m1, m2, true);
+				double imsValue = ims.getIMS(m1, m2);
+				double iicValue = iic.getMetric(m1, m2);
+				double eicValue = eic.getMetric(m1, m2);
+				
+				Metric metric = new Metric();
+				metric.setIas(iasValue);
+				metric.setIdc(idcValue);
+				metric.setIms(imsValue);
+				metric.setIic(iicValue);
+				metric.setEic(eicValue);
+				
+				double rs = getRS(metric, c);
+				
+				metric.setRs(rs);
+				rsVector.addElement(rs);
+				
+				String[] mName1 = m1.getID().split("\\.");
+				String[] mName2 = m2.getID().split("\\.");
+				ProjectAnalyzer.metrics.put(mName1[mName1.length-1] + "<->" + mName2[mName2.length-1], metric);
+			}
+		}
+		
+		Collections.sort(rsVector);
+		Collections.reverse(rsVector);
+		
+		return rsVector;
+	}
+	
+	public static void setWeights(ArrayList<String> methods){
+		IAS ias = new IAS();
+		IDC idc = new IDC();
+		IMS ims = new IMS();
+		IIC iic = new IIC();
+		EIC eic = new EIC();
+		
+		Hashtable<String, String> tmp = new Hashtable<String, String>();
+		
+		for(String key1: methods){
+			MyMethod m1 = ProjectAnalyzer.project.getMethod(key1);
+			for(String key2: methods){
+				MyMethod m2 = ProjectAnalyzer.project.getMethod(key2);
+				if(!m1.getID().equals(m2.getID()) && !tmp.containsKey(m1.getID() + "-" + m2.getID())){
+					
+					tmp.put(m1.getID() + "-" + m2.getID(), m1.getID() + "-" + m2.getID());
+					tmp.put(m2.getID() + "-" + m1.getID(), m2.getID() + "-" + m1.getID());
+					
+
+					
+					double iasValue = ias.getIAS(m1.getParent(), m1, m2);
+					double idcValue = idc.getIDC(m1, m2, true);
+					double imsValue = ims.getIMS(m1, m2);
+					double iicValue = iic.getMetric(m1, m2);
+					double eicValue = eic.getMetric(m1, m2);
+					
+					if(iasValue>0){
+						++wias;
+					}
+					
+					if(idcValue>0){
+						++widc;
+					}
+					
+					if(iicValue>0){
+						++wiic;
+					}
+					
+					if(imsValue>0){
+						++wims;
+					}
+					
+					if(eicValue>0){
+						++weic;
+					}
+					
+				}
+			}
+			
+		}
+		
+		wias = wias/(wias + widc + wiic + wims + weic + wecd);
+		widc = widc/(wias + widc + wiic + wims + weic + wecd);
+		wiic = wiic/(wias + widc + wiic + wims + weic + wecd);
+		wims = wims/(wias + widc + wiic + wims + weic + wecd);
+		weic = weic/(wias + widc + wiic + wims + weic + wecd);
+		wecd = wecd/(wias + widc + wiic + wims + weic + wecd);		
+		
+	}
+	
+	public class MetricValues{
+		private double ias;
+		private double idc;
+		private double iic;
+		private double ims;
+		private double eic;
+		private double ecd;
+		private double rs;
+		public MetricValues(double ias, double idc, double iic, double ims,
+				double eic, double ecd, double rs) {
+			this.ias = ias;
+			this.idc = idc;
+			this.iic = iic;
+			this.ims = ims;
+			this.eic = eic;
+			this.ecd = ecd;
+			this.rs = rs;
+		}
+		public double getIas() {
+			return ias;
+		}
+		public double getIdc() {
+			return idc;
+		}
+		public double getIic() {
+			return iic;
+		}
+		public double getIms() {
+			return ims;
+		}
+		public double getEic() {
+			return eic;
+		}
+		public double getEcd() {
+			return ecd;
+		}
+		public double getRs() {
+			return rs;
+		}
+		
+		
+	}
+}

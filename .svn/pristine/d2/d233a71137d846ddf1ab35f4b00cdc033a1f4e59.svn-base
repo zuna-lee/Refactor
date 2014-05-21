@@ -1,0 +1,184 @@
+package zuna.refactoring.codeChanger;
+
+import java.util.ArrayList;
+
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.IMethodBinding;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
+import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
+
+import zuna.model.MyClass;
+import zuna.model.MyMethod;
+import zuna.model.MyParameter;
+
+public class InternalInvocationChanger extends ChangeRewrite {
+	private IMethod movedMethod;
+	private String identifier;
+	private MyClass source;
+	private ArrayList<SimpleName> simpleNames = new ArrayList<SimpleName>();
+	private ArrayList<MethodInvocation> invocations = new ArrayList<MethodInvocation>();
+	private ArrayList<MyMethod> notMoved = new ArrayList<MyMethod>();
+	private IType type;
+	private String fileName;
+	private boolean hasNewParam = false;
+	
+	
+	public boolean isHasNewParam() {
+		return hasNewParam;
+	}
+
+	public InternalInvocationChanger(ArrayList<MyMethod> notMoved, MyClass source, IMethod movedMethod, String identifier){
+		this.type = movedMethod.getDeclaringType();
+		this.movedMethod = movedMethod;
+		this.identifier = identifier;
+		this.source = source;
+		this.notMoved = notMoved;
+		this.fileName = movedMethod.getDeclaringType().getTypeRoot().findPrimaryType().getElementName() + ".java";
+	}
+
+	@Override
+	protected void modify() {
+		try {
+			super.init(movedMethod);
+			this.modifyPointer();
+			this.modifyPointerTo();
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private void addParameter(String newNameString) throws Exception{
+		super.init(movedMethod);
+		MethodDeclaration newMd = md.getAST().newMethodDeclaration();
+		newMd = (MethodDeclaration)ASTNode.copySubtree(newMd.getAST(), md);
+		SingleVariableDeclaration variableDeclaration = newMd.getAST().newSingleVariableDeclaration();
+		variableDeclaration.setType(md.getAST().newSimpleType(newMd.getAST().newName(source.getName())));
+		SimpleName newName = newMd.getAST().newSimpleName(newNameString);
+		
+		variableDeclaration.setName(newName);
+		newMd.parameters().add(variableDeclaration);
+		
+		rewrite = ASTRewrite.create(md.getParent().getAST());
+		rewrite.replace(md, newMd, null);
+		
+		super.save();
+	}
+	
+	private void modifyPointerTo() throws Exception{
+		this.getMalInvocations();
+		String[] params = super.getSimpleName(movedMethod.getParameterTypes());
+		int cnt=0;
+		if(invocations.size()>0){
+			SimpleName newName = md.getAST().newSimpleName(source.getName().toLowerCase());
+			for(int i = invocations.size()-1 ; i >=0 ; i--){
+				Expression exp = invocations.get(i).getExpression();
+				if(exp==null || exp.toString().equals("this")){
+					
+					this.hasNewParam = true;
+					super.init(type, fileName, movedMethod.getElementName(), params);
+					MethodInvocation newInv = md.getAST().newMethodInvocation();
+					newInv = (MethodInvocation)ASTNode.copySubtree(newInv.getAST(), invocations.get(i));
+					newInv.setExpression(newInv.getAST().newSimpleName(newName.toString()));
+					rewrite = ASTRewrite.create(invocations.get(i).getParent().getAST());
+					rewrite.replace(invocations.get(i), newInv, null);
+					super.save();
+					
+				}
+			}
+			
+			if(this.hasNewParam) this.addParameter(newName.getIdentifier());
+			
+		}
+	}
+	
+	private void modifyPointer() throws JavaModelException, Exception {
+		this.getSimpleName();
+		for(int i = simpleNames.size()-1 ; i >=0 ; i--){
+			super.init(movedMethod);
+			if(simpleNames.get(i).getParent().toString().startsWith("this")){
+				rewrite = ASTRewrite.create(simpleNames.get(i).getParent().getParent().getAST());
+				rewrite.replace(simpleNames.get(i).getParent(), simpleNames.get(i).getAST().newThisExpression(), null);
+			}else{
+				rewrite = ASTRewrite.create(simpleNames.get(i).getParent().getAST());
+				rewrite.replace(simpleNames.get(i), simpleNames.get(i).getAST().newThisExpression(), null);
+			}
+			
+			super.save();
+		}
+	}
+	
+	private void getSimpleName(){
+		md.accept(new ASTVisitor(){
+			public boolean visit(SimpleName name){
+				if(name.getIdentifier().equals(identifier)){
+					simpleNames.add(name);
+				}
+				
+				return true;
+			}
+		});
+	}
+
+	private void getMalInvocations() throws JavaModelException{
+		super.init(movedMethod);
+		md.accept(new ASTVisitor(){
+			public boolean visit(MethodInvocation inv){
+				if(isMal(inv)){
+					invocations.add(inv);
+				}
+				
+				return true;
+			}
+			
+			private boolean isMal(MethodInvocation inv){
+				String identifier = inv.getName().getIdentifier();
+				IMethodBinding mb = inv.resolveMethodBinding();
+				if(mb==null){
+					return true;
+				}
+				IMethod callee = (IMethod) mb.getJavaElement();
+				String[] param = callee.getParameterTypes();
+				param = getSimpleName(param);
+				
+				for(MyMethod m: notMoved){
+					if(identifier.equals(m.getName())){
+						String[] param2 = this.getParam(m.getParameters());
+						boolean flg = true;
+						if(param.length == param2.length){
+							for(int i = 0 ; i < param.length ; i++){
+								if(!param[i].equals(param2[i])){
+									flg = false;
+								}
+							}
+						}
+						if(flg) return true;
+					}
+				}
+				return false;
+			}
+			
+			private String[] getParam(ArrayList<MyParameter> params){
+				String paramString[] = new String[params.size()];
+				for(int i = 0 ; i < params.size() ; i++){
+					MyParameter p = params.get(i);
+					paramString[i] = p.getType();
+				}
+				return paramString;
+			}
+			
+			
+		});
+	}
+	
+	
+}

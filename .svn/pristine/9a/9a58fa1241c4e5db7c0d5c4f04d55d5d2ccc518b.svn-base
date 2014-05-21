@@ -1,0 +1,38 @@
+package zuna.refactoring.operator.decompose;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+
+import zuna.metric.similarity.methodlevel.MethodLevelMetrics;
+import zuna.model.MyClass;
+import zuna.model.MyMethod;
+import zuna.util.KeyMaker;
+
+
+public class DecomposeClassByExternal extends DecomposeClass{
+	
+	private Hashtable<String, Double> edgeTable = new Hashtable<String, Double>();
+	private MethodLevelMetrics metrics;
+	
+	public DecomposeClassByExternal(MethodLevelMetrics metrics){
+		this.metrics = metrics;
+	}
+	
+	@Override
+	public void decompose(MyClass lc) {
+		this.establishEdgeTable(lc);
+	}
+
+	private void establishEdgeTable(MyClass lc) {
+		ArrayList<MyMethod> methods = lc.getOwnedMethods();
+		
+		for(int i = 0 ; i < methods.size() ; i++){
+			for(int j = i+1 ; j < methods.size() ; j++){
+				MyMethod m1 = methods.get(i);
+				MyMethod m2 = methods.get(j);
+				double relatedness = this.metrics.measure(m1, m2);
+				this.edgeTable.put(KeyMaker.getKey(m1, m2), relatedness);
+			}
+		}
+	}
+}

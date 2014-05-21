@@ -1,0 +1,7 @@
+package zuna.refactoring.operator.decompose;
+
+import zuna.model.MyClass;
+
+public abstract class DecomposeClass {
+	public abstract void decompose(MyClass lc);
+}

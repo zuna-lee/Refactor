@@ -1,0 +1,102 @@
+package zuna.refactoring.ui.operator;
+
+import java.util.ArrayList;
+
+import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.internal.corext.refactoring.structure.ASTNodeSearchUtil;
+
+import zuna.model.MyClass;
+import zuna.model.MyMethod;
+import zuna.parser.visitor.AbstractTypeDeclarationVisitor;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.operator.code.modifiers.Caller;
+import zuna.refactoring.operator.code.modifiers.CallerRewrite;
+import zuna.refactoring.operator.code.modifiers.CreateClass;
+import zuna.refactoring.ui.views.classDecomposesrViews.graph.ExtractionHelper;
+
+@SuppressWarnings("restriction")
+public class ExtractClass {
+	
+	private MethodDeclaration movedMd;
+	private MyClass oldClass;
+	private MyClass newClass;
+	
+	public ExtractClass(){
+		CreateClass.updated.clear();
+	}
+	
+	public MyClass createEmptyClass(MyClass oldClass, int idx){
+		this.oldClass = oldClass;
+		String newFileName = ExtractionHelper.getFileName(oldClass, idx);
+        CreateClass newClass = new CreateClass();
+        newClass.createEmptyClass(newFileName, oldClass.getParent().getPf());
+		ICompilationUnit iUnit = oldClass.getParent().getPf().getCompilationUnit(newFileName);
+		CompilationUnit unit = ExtractionHelper.parse(iUnit);
+		AbstractTypeDeclarationVisitor typeVisitor = new AbstractTypeDeclarationVisitor();
+		unit.accept(typeVisitor);
+		ArrayList<TypeDeclaration> classType = typeVisitor.getTypes();
+		TypeDeclaration td = classType.get(0);
+		String fullName = unit.getTypeRoot().findPrimaryType().getFullyQualifiedName();
+		this.newClass = new MyClass(fullName, td, unit, oldClass.getParent());
+		MyClass superClass = ProjectAnalyzer.project.getClass("java.lang.Object");
+		this.newClass.setSuperClass(superClass);
+		ProjectAnalyzer.project.getClassList().put(fullName, this.newClass);
+        return this.newClass;
+	}
+	
+	
+	public void moveMethods(ArrayList<MyMethod> movingMethods, MyClass source, MyClass target){
+			
+			
+		try {
+			for(MyMethod m: movingMethods){
+				if(m!=null){
+					AccessModiferRewrite child = changeAccessModifier(m);
+					IType targetType = target.getCu().getTypeRoot().findPrimaryType();
+					IMethod movingIMethod = (IMethod)child.getMd().resolveBinding().getJavaElement();
+					Caller caller = new Caller(movingIMethod);
+					caller.getCallersOf();
+					
+					movingIMethod.move(targetType, null, m.getName(), false, new NullProgressMonitor());
+					IMethod movedMethod = this.getIMethod(targetType, movingIMethod);
+//					MethodDeclaration movedMethodDecl = this.getMethodDecl(movedMethod.getDeclaringType(), movedMethod);
+					CallerRewrite rewrite = new CallerRewrite(movedMethod);
+					rewrite.makeNewField(targetType, movingIMethod, caller.makeCallerClassSet());
+					rewrite.changePointerOfCallerTo(caller.getCallerMethods(), movedMethod);
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	private AccessModiferRewrite changeAccessModifier(MyMethod m) {
+		AccessModiferRewrite child = new AccessModiferRewrite(m);
+		child.rewrite(m);
+		return child;
+	}
+	
+	private IMethod getIMethod(IType targetType, IMethod movingIMethod) throws JavaModelException{
+		return targetType.getMethod(movingIMethod.getElementName(), movingIMethod.getParameterTypes());
+	}
+	
+
+	
+	
+	private String[] getParam(MethodDeclaration md){
+		String[] param = new String[md.parameters().size()];
+		for(int i = 0 ; i < md.parameters().size() ; i++){
+			param[i] = md.parameters().get(i).toString();
+		}
+		return param;
+	}
+	
+
+}

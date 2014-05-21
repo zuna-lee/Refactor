@@ -1,0 +1,146 @@
+package zuna.refactoring.codeChanger;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+
+import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTParser;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
+
+public class PointerChanger extends ChangeRewrite {
+	private HashSet<IMethod> callerMethods;
+	private String fieldIdentifier;
+	private ArrayList<MethodInvocation> invocation = new ArrayList<MethodInvocation>();
+	
+	public PointerChanger(HashSet<IMethod> callerMethods, String fieldIdentifier){
+		this.callerMethods = callerMethods;
+		this.fieldIdentifier = fieldIdentifier;
+	}
+	
+//	protected void modify(){
+//		for(IMethod m: callerMethods){
+//			try{
+//				this.init(m);
+//				MethodDeclaration newMd = classUnit.getAST().newMethodDeclaration();
+//				newMd = (MethodDeclaration) ASTNode.copySubtree(newMd.getAST(), md);
+//				ArrayList<MethodInvocation> miList = this.getMethodInvocationStatement(m);
+//				for(MethodInvocation inv: miList){
+//					newMd.getBody().statements().get(0)
+//				}
+//				
+//			}catch(Exception e){
+//				
+//			}
+//			
+//		}
+//	}
+	
+	@Override
+	protected void modify() {
+		try {
+		
+			for(IMethod m: callerMethods){
+				m = this.init(m);
+				ArrayList<MethodInvocation> miList = this.getMethodInvocationStatement(m);
+				
+					for(int i = miList.size()-1 ; i >=0 ; i--){
+						this.init(m);
+						MethodInvocation inv = miList.get(i);
+						MethodInvocation newInv = md.getAST().newMethodInvocation();
+						newInv = (MethodInvocation)ASTNode.copySubtree(newInv.getAST(), inv);
+						newInv.setExpression(newInv.getAST().newSimpleName(this.fieldIdentifier));
+						rewrite = ASTRewrite.create(inv.getParent().getAST());
+						rewrite.replace(inv, newInv, null);
+						
+						super.save();
+					}
+				
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private IMethod getIMethod(IMethod caller) throws JavaModelException{
+		String fileName = caller.getDeclaringType().getTypeRoot().findPrimaryType().getElementName() + ".java";
+		IPackageFragment package1 = caller.getDeclaringType().getPackageFragment();
+		ICompilationUnit cu = package1.getCompilationUnit(fileName);
+		ASTParser parser = ASTParser.newParser(AST.JLS4);
+		parser.setSource(cu);
+		CompilationUnit classUnit = (CompilationUnit) parser.createAST(null);
+		setMethodDecl(classUnit, caller);
+		IMethod m = (IMethod) cu.getElementAt(md.getStartPosition());
+		
+		return m;
+		
+	}
+	private ArrayList<MethodInvocation> getMethodInvocationStatement(IMethod m){
+		invocation.clear();
+		try {
+			MethodDeclaration md = super.getMethodDecl(m);
+			md.accept(new ASTVisitor(){
+				public boolean visit(MethodInvocation inv){
+					if(this.isMatched(inv)){
+						invocation.add(inv);
+					}
+					return true;
+				}
+				
+				private boolean isMatched(MethodInvocation inv){
+					if(inv.resolveMethodBinding()==null){
+						return true;
+					}
+					return false;
+				}
+			});
+		} catch (JavaModelException e) {
+			e.printStackTrace();
+		}
+		
+		return invocation;
+	}
+	
+	protected IMethod init(IMethod caller) throws JavaModelException{
+		caller.getSource();
+			setICompilationUnit(caller);
+			
+			cu.getSource();
+			setCompilationUnit();
+			setDocument();
+			String src = document.get();
+			setMethodDecl(classUnit, caller);
+			md.toString();
+			IMethod m = (IMethod) cu.getElementAt(md.getStartPosition());
+			
+			return m;
+		
+		
+	}
+	
+	
+	
+	
+
+	private void setICompilationUnit(IMethod caller) {
+		String fileName = caller.getDeclaringType().getTypeRoot().findPrimaryType().getElementName() + ".java";
+		IPackageFragment package1 = caller.getDeclaringType().getPackageFragment();
+		cu = package1.getCompilationUnit(fileName);
+		
+		try {
+			workingCopy = cu.getWorkingCopy(new NullProgressMonitor());
+		} catch (JavaModelException e) {
+			e.printStackTrace();
+		}
+	}
+
+}

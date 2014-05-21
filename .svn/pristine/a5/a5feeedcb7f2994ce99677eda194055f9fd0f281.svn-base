@@ -1,0 +1,37 @@
+package zuna.mining;
+
+import zuna.model.MyIdentifier;
+
+public class Database {
+
+	private String methodID;
+	private MyIdentifier identifiers;
+	
+	public int getElementCount(String term) {
+		// TODO Auto-generated method stub
+		if (identifiers != null) {
+			
+			return identifiers.getElementCount(term);	
+		}
+		else {
+			
+			return 0;
+		}
+	}
+
+	public String getId() {
+		return methodID;
+	}
+
+	public void setId(String id) {
+		this.methodID = id;
+	}
+
+	public MyIdentifier getItem() {
+		return identifiers;
+	}
+
+	public void setItem(MyIdentifier item) {
+		this.identifiers = item;
+	}
+}

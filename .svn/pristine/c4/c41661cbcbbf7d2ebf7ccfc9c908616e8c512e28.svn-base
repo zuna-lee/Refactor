@@ -1,0 +1,78 @@
+package zuna.model;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class MyIdentifier {
+
+	private List<String> identifiers = new ArrayList<String>();
+
+	public boolean contains(String e) {
+		
+		return identifiers.contains(e);
+	}
+	
+	public boolean contains(String e1, String e2) {
+		
+		boolean result = identifiers.contains(e1) && identifiers.contains(e2);
+		
+		return result;
+	}
+	
+	public int getElementCount(String e) {
+		
+		int count = 0;
+		
+		for (String identifier : identifiers) {
+			
+			if (identifier.equals(e)) {
+				
+				count++;
+			}
+		}
+		
+		return count;
+	}
+	
+	public int getElementCount(String e1, String e2) {
+		
+		int count1 = 0, count2 = 0;
+		
+		for (String identifier : identifiers) {
+			
+			if (identifier.equals(e1)) {
+				
+				count1++;
+			}
+			
+			if (identifier.equals(e2)) {
+				
+				count2++;
+			}
+		}
+		
+		return Math.min(count1, count2);
+	}
+	
+	public List<String> getIdentifiers() {
+		return identifiers;
+	}
+
+	public void setIdentifiers(List<String> identifiers) {
+		this.identifiers = identifiers;
+	}
+
+	@Override
+	public String toString() {
+		// TODO Auto-generated method stub
+		String str = "";
+		
+		for (String identifier : identifiers) {
+			
+			str += "\t";
+			str += identifier;
+		}
+		
+		return str;
+	}
+}

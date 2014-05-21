@@ -1,0 +1,52 @@
+package zuna.util;
+
+import java.util.ArrayList;
+
+import zuna.model.MyClass;
+import zuna.model.MyMethod;
+
+public class MethodFilter {
+
+	public static int getOwnedNormalMethods(MyClass c){
+		ArrayList<MyMethod> methods = c.getOwnedMethods();
+		int cnt=0;
+		for(MyMethod m: methods){
+			if(isTarget(m)) cnt++; 
+		}
+		
+		return cnt;
+	}
+	public static boolean isTarget(MyMethod m){
+		return !(m.getStatementCnt()<1 || m.isAbstract() || m.isConstructor() 
+				|| m.isOverride() || m.isSupport() || hasCall2Parent(m));
+	}
+	
+	private static boolean hasCall2Parent(MyMethod m){
+		ArrayList<MyMethod> outs = m.getFanOut();
+		MyClass c = m.getParent();
+		ArrayList<MyClass> parents = new ArrayList<MyClass>();
+		parents = getParents(c, parents);
+		
+		for(MyMethod o: outs){
+			for(MyClass p: parents){
+				if(!p.getID().equals(c.getID()) && p.getID().equals(o.getParent().getID())){
+					return true;
+				}
+			}
+		}
+		
+		return false;
+	}
+	
+	private static ArrayList<MyClass> getParents(MyClass c, ArrayList<MyClass> parents){
+		MyClass p = null;
+		p = c.getSuperClass();
+		
+		if(p!=null){
+			parents.add(p);
+			getParents(p, parents);
+		}
+		
+		return parents;
+	}
+}

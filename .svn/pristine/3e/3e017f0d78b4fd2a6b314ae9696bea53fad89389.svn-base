@@ -1,0 +1,126 @@
+/*
+ * This file is licensed to You under the "Simplified BSD License".
+ * You may not use this software except in compliance with the License. 
+ * You may obtain a copy of the License at
+ *
+ * http://www.opensource.org/licenses/bsd-license.php
+ * 
+ * See the COPYRIGHT file distributed with this work for information
+ * regarding copyright ownership.
+ */
+package zuna.mining.hac.dendrogram;
+
+import java.util.ArrayList;
+import java.util.Vector;
+
+import zuna.model.MyParameter;
+
+
+/**
+ * A Dendrogram represents the results of hierachical agglomerative clustering.
+ * The root represents a single cluster containing all observations.
+ * 
+ * @author Matthias.Hauswirth@usi.ch
+ */
+public final class Dendrogram {
+
+    private final DendrogramNode root;
+    private ArrayList<MyParameter> cluster;
+
+    public Dendrogram(final DendrogramNode root) {
+        this.root = root;
+    }
+
+    public DendrogramNode getRoot() {
+        return root;
+    }
+
+    public void dump() {
+        dumpNode("  ", root);
+    }
+
+    private void dumpNode(final String indent, final DendrogramNode node) {
+        if (node==null) {
+            System.out.println(indent+"<null>");
+        } else if (node instanceof ObservationNode) {
+            System.out.println(indent+"Observation: "+node);
+        } else if (node instanceof MergeNode) {
+            System.out.print(indent+"Merge:");
+            
+            double similarity = getSimilarity(node);
+            
+            System.out.format("(%.2f):%n", similarity);
+            
+            dumpNode(indent+"  ", ((MergeNode)node).getLeft());
+            dumpNode(indent+"  ", ((MergeNode)node).getRight());
+        }
+    }
+
+    public Vector<ArrayList<MyParameter>> getClusters(double d) {
+		
+		Vector<ArrayList<MyParameter>> SetOfClusters = new Vector<ArrayList<MyParameter>>();
+		
+		findMergeNodeSimilarThan(SetOfClusters, d, root);
+		
+		return SetOfClusters;
+	}
+
+	private void findMergeNodeSimilarThan(Vector<ArrayList<MyParameter>> setOfClusters, double similarity, DendrogramNode node) {
+		
+		if (node == null) {
+			;
+		}
+		else if (node instanceof ObservationNode) {
+			
+			cluster = new ArrayList<MyParameter>();
+			
+			ObservationNode observationNode = (ObservationNode) node;
+			
+			cluster.add(observationNode.getParameter());
+			
+			setOfClusters.add(cluster);
+			
+		}
+		else if (node instanceof MergeNode) {
+
+			double s = getSimilarity(node);
+			
+			if (similarity <= s) {
+				
+				cluster = new ArrayList<MyParameter>();
+				
+				makeCluster(node);
+				
+				setOfClusters.add(cluster);
+				
+			}
+			else {
+				
+				findMergeNodeSimilarThan(setOfClusters, similarity, node.getLeft());
+				findMergeNodeSimilarThan(setOfClusters, similarity, node.getRight());
+			}
+		}
+	}
+
+	private void makeCluster(DendrogramNode node) {
+		
+		if (node instanceof ObservationNode) {
+			
+			ObservationNode observationNode = (ObservationNode) node;
+			
+			cluster.add(observationNode.getParameter());
+		}
+		else if (node instanceof MergeNode) {
+			
+			makeCluster(((MergeNode) node).getLeft());
+			makeCluster(((MergeNode) node).getRight());
+		}
+	}
+
+	private double getSimilarity(DendrogramNode node) {
+		
+		double similarity = 1 - ((MergeNode) node).getDissimilarity();
+		
+		return similarity;
+	}
+}

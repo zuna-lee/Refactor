@@ -1,0 +1,68 @@
+package zuna.refactoring.code;
+
+import org.eclipse.jdt.core.IField;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.internal.corext.codemanipulation.GetterSetterUtil;
+
+
+@SuppressWarnings("restriction")
+public class GetterSetterGenerator {
+
+	public IMethod getSetter(IField field){
+		IMethod setter = null;
+		try {
+			setter = GetterSetterUtil.getGetter(field);
+			if(setter!=null){
+				AccessModifierChanger accessChanger = new AccessModifierChanger(setter);
+				accessChanger.change();
+			}else{
+				setter = this.generateSetter(field);
+			}
+			
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		
+		return setter;
+	}
+
+	public IMethod getGetter(IField field){
+		IMethod getter = null;
+		try {
+			getter = GetterSetterUtil.getGetter(field);
+			if(getter!=null){
+				AccessModifierChanger accessChanger = new AccessModifierChanger(getter);
+				accessChanger.change();
+			}else{
+				getter = this.generateGetter(field);
+			}
+			
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return getter;
+	}
+	
+	private IMethod generateGetter(IField field) {
+		String buf = "";
+		String type = "";
+		buf+="public " + type + " get" + field.getElementName() + "(){ \n";
+		buf+="    return " + field.getElementName() + "; \n";
+		buf+="}";
+		return null;
+	}
+
+	private IMethod generateSetter(IField field) {
+		String buf = "";
+		String type  = "";
+		buf+="public void set" + field.getElementName() + "("+ type + " " + field.getElementName() + "){ \n";
+		buf+="    this." + field.getElementName() + " = "+ field.getElementName()+"; \n";
+		buf+="}";
+		return null;
+	}
+}

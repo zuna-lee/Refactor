@@ -1,0 +1,75 @@
+package zuna.metric.similarity;
+
+import zuna.metric.similarity.methodlevel.DM;
+import zuna.metric.similarity.methodlevel.EIC;
+import zuna.metric.similarity.methodlevel.IAS;
+import zuna.metric.similarity.methodlevel.IDC;
+import zuna.metric.similarity.methodlevel.IIC;
+import zuna.metric.similarity.methodlevel.IMS;
+import zuna.model.MyClass;
+import zuna.model.MyMethod;
+import zuna.refactoring.Metric;
+import zuna.refactoring.ProjectAnalyzer;
+
+public class MetricCalculator {
+
+	public static double wias = 0.0;
+	public static double widc = 0.0;
+	public static double wiic = 0.0;
+	public static double wims = 0.0;
+	public static double weic = 0.0;
+	public static double wecd = 0.0;
+	public MyClass c;
+	
+	public static double getEPMetric(MyMethod m1, MyMethod m2){
+		double metric = 0.0;
+		DM ep = new DM();
+		metric = ep.getMetric(m1, m2);
+		return 1 - metric;
+	}
+	
+	public static Metric getRSMetric(MyMethod m1, MyMethod m2){
+		
+		IAS ias = new IAS();
+		IDC idc = new IDC();
+		IMS ims = new IMS();
+		IIC iic = new IIC();
+		EIC eic = new EIC();
+		
+		
+		double iasValue = ias.getIAS(m1.getParent(), m1, m2);
+		double idcValue = idc.getIDC(m1, m2, true);
+		double imsValue = ims.getIMS(m1, m2);
+		double iicValue = iic.getMetric(m1, m2);
+		double eicValue = eic.getMetric(m1, m2);
+		
+		Metric metric = new Metric();
+		metric.setIas(iasValue);
+		metric.setIdc(idcValue);
+		metric.setIms(imsValue);
+		metric.setIic(iicValue);
+		metric.setEic(eicValue);
+		double rs = getRS(metric, m1.getParent());
+		metric.setRs(rs);
+		
+		String[] mName1 = m1.getID().split("\\.");
+		String[] mName2 = m2.getID().split("\\.");
+		ProjectAnalyzer.metrics.put(mName1[mName1.length-1] + "<->" + mName2[mName2.length-1], metric);
+
+		return metric;
+	}
+	
+	public MetricCalculator(MyClass c){
+		this.c = c;
+	}
+	
+	public static double getRS(Metric metric, MyClass c){
+		double rs = wias * (1 - metric.getIas()) + widc * (1 - metric.getIdc())  +  + wiic * (1 - metric.getIic()) +
+				wims * (1 - metric.getIms()) + weic * (1 - metric.getEic()) + wecd * (1 - metric.getEcd());
+		
+//		double rs = (1 - metric.getIas()) + (1 - metric.getIdc())  +  (1 - metric.getIic()) +
+//				(1 - metric.getIms()) + (1 - metric.getEic()) + (1 - metric.getEcd());
+		
+		return rs;
+	}
+}

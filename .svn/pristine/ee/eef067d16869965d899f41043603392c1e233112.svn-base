@@ -1,0 +1,346 @@
+package zuna.refactoring.code;
+
+import java.util.ArrayList;
+import java.util.Vector;
+
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IField;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.FieldAccess;
+import org.eclipse.jdt.core.dom.IMethodBinding;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
+import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
+
+import zuna.model.MyClass;
+import zuna.model.MyField;
+import zuna.model.MyMethod;
+import zuna.model.MyParameter;
+import zuna.refactoring.ProjectAnalyzer;
+
+public class InternalInvocationChanger extends ChangeRewrite {
+	private IMethod movedMethod;
+	private String identifier;
+	private MyClass source;
+	private ArrayList<SimpleName> simpleNames = new ArrayList<SimpleName>();
+	private ArrayList<MethodInvocation> invocations = new ArrayList<MethodInvocation>();
+	private ArrayList<ArrayList<Object>> fieldAccess = new ArrayList<ArrayList<Object>>();
+	
+	private ArrayList<MyMethod> notMoved = new ArrayList<MyMethod>();
+	private IType type;
+	private String fileName;
+	private boolean hasNewParam = false;
+	private boolean hasNewParam4FieldAccess = false;
+	private String paramType;
+	private String paramName;
+	private Vector<Vector<String>> result = new Vector<Vector<String>>();
+	private int current;
+	private String addedParamType = null;
+	
+	public boolean isHasNewParam() {
+		return hasNewParam;
+	}
+
+	
+	public boolean isHasNewParam4FieldAccess() {
+		return hasNewParam4FieldAccess;
+	}
+
+
+	public InternalInvocationChanger(ArrayList<MyMethod> notMoved, MyClass source, IMethod movedMethod, MyMethod old, String identifier,
+			Vector<Vector<String>> result, int current){
+		super.m = old;
+		this.type = movedMethod.getDeclaringType();
+		this.movedMethod = movedMethod;
+		this.identifier = identifier;
+		this.source = source;
+		this.notMoved = notMoved;
+		this.fileName = movedMethod.getDeclaringType().getTypeRoot().findPrimaryType().getElementName() + ".java";
+		this.current = current;
+		this.result = result;
+	}
+
+	@Override
+	protected void modify() {
+		try {
+			super.init(movedMethod);
+			this.modifyPointerOfInternalFieldAccess();
+			this.modifyPointerOfSourceFieldAccess();
+			this.modifyPointerOfMethodInvocations();
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	private void modifyPointerOfSourceFieldAccess() {
+		try {
+
+			this.getMalFieldAcess();
+			if(fieldAccess.size()>0){
+				
+				hasNewParam4FieldAccess = true;
+				SimpleName newName = md.getAST().newSimpleName(source.getName().toLowerCase());
+				
+				for(int i = fieldAccess.size()-1 ; i >=0 ; i--){
+					ArrayList<Object> aryAccess = fieldAccess.get(i);
+					for(Object a: aryAccess){
+						if(a instanceof SimpleName){
+							
+							if(this.addedParamType!=null){
+								super.init(this.movedMethod, this.addedParamType);
+							}else{
+								super.init(this.movedMethod);
+							}
+							
+							GetterSetterGenerator generator = new GetterSetterGenerator();
+							SimpleName field = (SimpleName) a;
+							ICompilationUnit sourceUnit = super.getICompilationUnit(source.getCu().getTypeRoot().findPrimaryType(), source.getName() + ".java");
+							IField referredField = super.getField(sourceUnit, field.getIdentifier());
+							IMethod getter = generator.getGetter(referredField);
+							
+							FieldAccess newAccess = md.getAST().newFieldAccess();
+							newAccess.setName(md.getAST().newSimpleName(field.getIdentifier()));
+							MethodInvocation getterInv = source.getCu().getAST().newMethodInvocation();
+							getterInv.setName(source.getCu().getAST().newSimpleName(getter.getElementName()));
+							getterInv.setExpression(source.getCu().getAST().newSimpleName(newName.toString()));
+//							newAccess.setExpression(getterInv);
+							
+							int length = newName.toString().length() + field.getIdentifier().length();
+							newAccess.setSourceRange(field.getStartPosition(), length);
+							
+							rewrite = ASTRewrite.create(field.getParent().getAST());
+							rewrite.replace(field, getterInv, null);
+							super.save();
+						}
+					}
+				}
+				
+				this.paramType = source.getName();
+				this.paramName = newName.getIdentifier();
+				this.addParameter();
+			}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+
+	@SuppressWarnings("unchecked")
+	private void addParameter() throws Exception{
+		if(addedParamType==null) super.init(movedMethod);
+		else {
+			super.init(movedMethod, addedParamType);
+		}
+		
+		MethodDeclaration newMd = md.getAST().newMethodDeclaration();
+		newMd = (MethodDeclaration)ASTNode.copySubtree(newMd.getAST(), md);
+		SingleVariableDeclaration variableDeclaration = newMd.getAST().newSingleVariableDeclaration();
+		
+//		if(this.paramType.contains("<")){
+//			String[] token = this.paramType.split("<");
+//			String typeD = token[0];
+//			String typeP = token[token.length-1].substring(0, token[token.length-1].length()-1);
+//			ParameterizedType pt = md.getAST().newParameterizedType(newMd.getAST().newSimpleType(newMd.getAST().newSimpleName(typeD)));
+//			pt.typeArguments().add(newMd.getAST().newSimpleType(newMd.getAST().newSimpleName(typeP)));
+//			variableDeclaration.setType(pt);
+//			this.addedParamType = typeD + "<" + typeP + ">";
+//		}else{
+		this.addedParamType = this.paramType;
+		variableDeclaration.setType(md.getAST().newSimpleType(newMd.getAST().newName(this.paramType)));
+//		}
+		
+		SimpleName newName = newMd.getAST().newSimpleName(this.paramName);
+		
+		variableDeclaration.setName(newName);
+		newMd.parameters().add(variableDeclaration);
+		
+		rewrite = ASTRewrite.create(md.getParent().getAST());
+		rewrite.replace(md, newMd, null);
+		
+		super.save();
+	}
+	
+	private void modifyPointerOfMethodInvocations() throws Exception{
+		this.getMalInvocations();
+		
+//		String[] params = super.getSimpleName(movedMethod.getParameterTypes());
+		
+		if(invocations.size()>0){
+			SimpleName newName = md.getAST().newSimpleName(source.getName().toLowerCase());
+			for(int i = invocations.size()-1 ; i >=0 ; i--){
+				Expression exp = invocations.get(i).getExpression();
+				if(exp==null || exp.toString().equals("this")){
+					this.hasNewParam = true;
+					
+					if(this.addedParamType!=null) super.init(movedMethod, this.addedParamType);
+					else super.init(movedMethod);
+					
+					MethodInvocation newInv = md.getAST().newMethodInvocation();
+					newInv = (MethodInvocation)ASTNode.copySubtree(newInv.getAST(), invocations.get(i));
+					newInv.setExpression(newInv.getAST().newSimpleName(newName.toString()));
+					rewrite = ASTRewrite.create(invocations.get(i).getParent().getAST());
+					rewrite.replace(invocations.get(i), newInv, null);
+					super.save();
+					if(this.addedParamType!=null) super.init(movedMethod, this.addedParamType);
+					else super.init(movedMethod);
+				}
+			}
+			
+			if(this.hasNewParam && !this.hasNewParam4FieldAccess) {
+				this.paramType = source.getName();
+				this.paramName = newName.getIdentifier();
+				this.addParameter();
+			}
+			
+		}
+	}
+	
+	private void modifyPointerOfInternalFieldAccess() throws JavaModelException, Exception {
+		this.getSimpleName();
+		for(int i = simpleNames.size()-1 ; i >=0 ; i--){
+			super.init(movedMethod);
+			if(simpleNames.get(i).getParent().toString().startsWith("this")){
+				rewrite = ASTRewrite.create(simpleNames.get(i).getParent().getParent().getAST());
+				rewrite.replace(simpleNames.get(i).getParent(), simpleNames.get(i).getAST().newThisExpression(), null);
+			}else{
+				rewrite = ASTRewrite.create(simpleNames.get(i).getParent().getAST());
+				rewrite.replace(simpleNames.get(i), simpleNames.get(i).getAST().newThisExpression(), null);
+			}
+			
+			super.save();
+		}
+	}
+	
+	private void getSimpleName(){
+		md.accept(new ASTVisitor(){
+			public boolean visit(SimpleName name){
+				if(name.getIdentifier().equals(identifier)){
+					simpleNames.add(name);
+				}
+				
+				return true;
+			}
+		});
+	}
+	private void getMalFieldAcess() throws JavaModelException{
+		super.init(movedMethod);
+		this.fieldAccess.clear();
+		md.accept(new ASTVisitor(){
+
+			public boolean visit(SimpleName access){
+				MyField f=null;
+				if(!this.contains(access) && (f = this.isExistInOtherCluster(access))!=null){
+					ArrayList<Object> aryAccess = new ArrayList<Object>();
+					aryAccess.add(access);
+					aryAccess.add(f);
+					fieldAccess.add(aryAccess);
+				}
+				
+				return true;
+			}
+			
+			private MyField isExistInOtherCluster(SimpleName access){
+				for(int i = 0 ; i < result.size() ; i++){
+					if(i!=current){
+						Vector<String> cluster = result.get(i);
+						for(int k = 0 ; k < cluster.size() ; k++){
+							if(ProjectAnalyzer.project.getFieldList().containsKey(cluster.get(k))){
+								if(ProjectAnalyzer.project.getFieldList().get(cluster.get(k)).getID().endsWith(access.getIdentifier())){
+									return ProjectAnalyzer.project.getFieldList().get(cluster.get(k));
+								}
+							}
+						}
+					}
+				}
+				return null;
+			}
+			
+			private boolean contains(SimpleName access){
+				for(int i = 0 ; i < fieldAccess.size() ; i++){
+					ArrayList<Object> aryAccess = fieldAccess.get(i);
+					for(Object a: aryAccess){
+						if(a instanceof SimpleName){
+							SimpleName name = (SimpleName) a;
+							if(name.getIdentifier().equals(access.toString())
+									&& name.getStartPosition() == access.getStartPosition()){
+								return true;
+							}
+						}
+					}
+					
+				}
+				
+				return false;
+			}
+		});
+	}
+	
+	private void getMalInvocations() throws JavaModelException{
+		super.init(movedMethod);
+		md.accept(new ASTVisitor(){
+			public boolean visit(MethodInvocation inv){
+				if(isMal(inv)){
+					invocations.add(inv);
+				}
+				
+				return true;
+			}
+			
+			private boolean isMal(MethodInvocation inv){
+				String identifier = inv.getName().getIdentifier();
+				IMethodBinding mb = inv.resolveMethodBinding();
+				if(mb==null){
+					return true;
+				}
+				IMethod callee = (IMethod) mb.getJavaElement();
+				String[] param = callee.getParameterTypes();
+				param = getSimpleName(param);
+				
+				for(MyMethod m: notMoved){
+					if(identifier.equals(m.getName())){
+						String[] param2 = this.getParam(m.getParameters());
+						boolean flg = true;
+						if(param.length == param2.length){
+							for(int i = 0 ; i < param.length ; i++){
+								if(!param[i].equals(param2[i])){
+									flg = false;
+								}
+							}
+						}
+						if(flg) return true;
+					}
+				}
+				return false;
+			}
+			
+			private String[] getParam(ArrayList<MyParameter> params){
+				String paramString[] = new String[params.size()];
+				for(int i = 0 ; i < params.size() ; i++){
+					MyParameter p = params.get(i);
+					paramString[i] = p.getType();
+				}
+				return paramString;
+			}
+			
+			
+		});
+	}
+
+	@Override
+	public void changeProject() {
+		super.m.setMd(md);
+		if(this.hasNewParam) super.m.addParameter(this.paramType, this.paramName);
+	}
+	
+	
+}

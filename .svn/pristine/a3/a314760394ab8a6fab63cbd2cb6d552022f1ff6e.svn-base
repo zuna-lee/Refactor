@@ -1,0 +1,130 @@
+package zuna.metric;
+
+import java.util.Hashtable;
+import java.util.Vector;
+
+import zuna.model.MyClass;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.util.KeyMaker;
+
+public class MQFunction {
+	
+
+	private Vector<Vector<String>> result = new Vector<Vector<String>>();
+	private Hashtable<String, Double> matrix = new Hashtable<String, Double>();
+
+	
+	public MQFunction(Vector<Vector<String>> result, Hashtable<String, Double> matrix){
+		this.result = result;
+		this.matrix = matrix;
+	}
+	
+	public double averageSimilarity(){
+		double similarity=0.0;
+		for(String key: matrix.keySet()){
+			similarity += 1 - matrix.get(key);
+		}
+		
+		if(Double.isNaN(similarity/(double) matrix.size())){
+			return 0.0;
+		}else{
+			return similarity/(double) matrix.size();
+		}
+	}
+	
+	public double getMQ(MyClass lc) {
+		double mq = 0.0;
+		double cnt=0.0;
+		double intra = 0.0;
+		double inter = 0.0;
+		
+		for(int i =  0 ; i < this.result.size() ; i++){
+			Vector<String> cluster = this.result.get(i);
+			if(this.numberOfMethodsIn(cluster)==1) intra+=1;
+			else intra += this.intraMQ(cluster);
+		}
+		
+		for(int i =  0 ; i < this.result.size()-1 ; i++){
+			for(int k =  i+1 ; k < this.result.size() ; k++){
+				inter+=this.interMQ(this.result.get(i), this.result.get(k));
+				cnt+=1.0;
+			}
+		}
+		
+		mq = (intra/(double)this.result.size()) - (inter/cnt);
+		if(Double.isNaN(mq)) return 0.0;
+		else return mq;
+	}
+	
+	private int numberOfMethodsIn(Vector<String> cluster){
+		int cnt = 0;
+		for(String key: cluster){
+			if(ProjectAnalyzer.project.getMethodList().containsKey(key)){
+				cnt++;
+			}
+		}
+		
+		return cnt;
+	}
+	
+	private double interMQ(Vector<String> cluster, int clusterID){
+		double cnt = 0.0;
+		double totSimilarity = 0.0;
+		
+		for(int i =  0 ; i < this.result.size() ; i++){
+			if(i!=clusterID){
+				Vector<String> linked = this.result.get(i);
+				for(String from: cluster){
+					for(String to: linked){
+						if(ProjectAnalyzer.project.getMethodList().containsKey(from) &&
+								ProjectAnalyzer.project.getMethodList().containsKey(to)){
+							cnt+=1.0;
+							double similarity = 1 - this.matrix.get(KeyMaker.getKey(from, to));
+							totSimilarity+=similarity;
+						}
+					}
+				}
+			}
+		}
+		if(Double.isNaN(totSimilarity/cnt)) return 0.0;
+		else return totSimilarity/cnt;
+	}
+	
+	private double interMQ(Vector<String> cluster1, Vector<String> cluster2){
+		double cnt = 0.0;
+		double totSimilarity = 0.0;
+		
+		for(String from: cluster1){
+			for(String to: cluster2){
+				if(ProjectAnalyzer.project.getMethodList().containsKey(from) &&
+						ProjectAnalyzer.project.getMethodList().containsKey(to)){
+						cnt+=1.0;
+						double similarity = 1 - this.matrix.get(KeyMaker.getKey(from, to));
+						totSimilarity+=similarity;
+				}
+			}
+		}
+		
+		if(Double.isNaN(totSimilarity/cnt)) return 0.0;
+		else return totSimilarity/cnt;
+	}
+	
+	private double intraMQ(Vector<String> cluster){
+		double cnt = 0;
+		double totSimilarity = 0;
+		for(int i = 0 ; i < cluster.size()-1 ; i++){
+			for(int k = i+1 ; k < cluster.size() ; k++){
+				if(ProjectAnalyzer.project.getMethodList().containsKey(cluster.get(k)) &&
+						ProjectAnalyzer.project.getMethodList().containsKey(cluster.get(i))){
+
+					cnt+=1.0;
+					double similarity = 1 - this.matrix.get(KeyMaker.getKey(cluster.get(i), cluster.get(k)));
+					totSimilarity +=similarity;
+				}
+				
+			}
+		}
+		if(Double.isNaN(totSimilarity/cnt)) return 0.0;
+		else return totSimilarity/cnt;
+	}
+}

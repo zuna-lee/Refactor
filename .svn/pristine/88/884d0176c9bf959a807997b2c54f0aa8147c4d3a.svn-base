@@ -1,0 +1,130 @@
+package zuna.refactoring.code;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
+
+public class PointerChanger extends ChangeRewrite {
+	private HashSet<IMethod> callerMethods;
+	private String fieldIdentifier;
+	private ArrayList<MethodInvocation> invocation = new ArrayList<MethodInvocation>();
+	private String[] paramOfMovingMethod;
+	private String movingMethodName;
+	private boolean hasAddedNewParam;
+	public PointerChanger(IMethod movingMethod, HashSet<IMethod> callerMethods, String fieldIdentifier,
+			boolean hasAddedNewParam){
+		
+		this.callerMethods = callerMethods;
+		this.fieldIdentifier = fieldIdentifier;
+		
+		this.paramOfMovingMethod = getSimpleName(movingMethod.getParameterTypes());
+		this.movingMethodName = movingMethod.getElementName();
+		this.hasAddedNewParam = hasAddedNewParam;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	protected void modify() {
+		try {
+			for(IMethod m: callerMethods){
+				m = this.init(m);
+				ArrayList<MethodInvocation> miList = this.getMethodInvocationStatement(m);
+					for(int i = miList.size()-1 ; i >=0 ; i--){
+						this.init(m);
+						MethodInvocation inv = miList.get(i);
+						MethodInvocation newInv = md.getAST().newMethodInvocation();
+						newInv = (MethodInvocation)ASTNode.copySubtree(newInv.getAST(), inv);
+						newInv.setExpression(newInv.getAST().newSimpleName(this.fieldIdentifier));
+						if(hasAddedNewParam) newInv.arguments().add(md.getAST().newThisExpression());
+						rewrite = ASTRewrite.create(inv.getParent().getAST());
+						rewrite.replace(inv, newInv, null);
+						
+						super.save();
+					}
+				
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private ArrayList<MethodInvocation> getMethodInvocationStatement(IMethod m){
+		invocation.clear();
+		try {
+			MethodDeclaration md = super.getMethodDecl(m);
+			md.accept(new ASTVisitor(){
+				public boolean visit(MethodInvocation inv){
+					if(this.isMatched(inv)){
+						if(!contains(inv)){
+							invocation.add(inv);
+						}
+					}
+					return true;
+				}
+				
+				private boolean isMatched(MethodInvocation inv){
+					if(inv.resolveMethodBinding()==null){
+						return true;
+					}
+					return false;
+				}
+				
+				
+				public boolean visit(SimpleName inv){
+					if(inv.getParent() instanceof MethodInvocation){
+						MethodInvocation invc = (MethodInvocation) inv.getParent();
+						
+						
+						if(this.isMatched(invc)){
+							if(!contains(invc)){
+								invocation.add(invc);
+							}
+								
+						}else{
+							if(inv.resolveBinding().getJavaElement() instanceof IMethod){
+								IMethod method = (IMethod)inv.resolveBinding().getJavaElement();
+								String[] params = getSimpleName(method.getParameterTypes());
+								if(method.getElementName().equals(movingMethodName) && params.length==paramOfMovingMethod.length){
+									if(!contains(invc)){
+										invocation.add(invc);
+									}
+								}
+							}
+						}
+					}
+					return true;
+				}
+				
+				
+				private boolean contains(MethodInvocation invc){
+					for(int i = 0 ; i < invocation.size() ; i++){
+						if(invocation.get(i).toString().equals(invc.toString())){
+							return true;
+						}
+					}
+					
+					return false;
+				}
+			});
+		} catch (JavaModelException e) {
+			e.printStackTrace();
+		}
+		
+		return invocation;
+	}
+
+	@Override
+	public void changeProject() {
+		// TODO Auto-generated method stub
+		
+	}
+
+}

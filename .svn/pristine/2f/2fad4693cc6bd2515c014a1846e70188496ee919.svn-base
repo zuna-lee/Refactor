@@ -1,0 +1,258 @@
+package zuna.refactoring.code;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
+
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IField;
+import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IMember;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.Signature;
+import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.internal.corext.codemanipulation.AddGetterSetterOperation;
+import org.eclipse.jdt.internal.corext.codemanipulation.CodeGenerationSettings;
+import org.eclipse.jdt.internal.corext.codemanipulation.GetterSetterUtil;
+import org.eclipse.jdt.internal.corext.codemanipulation.IRequestQuery;
+import org.eclipse.jdt.internal.corext.refactoring.util.RefactoringASTParser;
+import org.eclipse.jdt.internal.corext.util.Messages;
+import org.eclipse.jdt.internal.ui.JavaPlugin;
+import org.eclipse.jdt.internal.ui.actions.ActionMessages;
+import org.eclipse.jdt.internal.ui.actions.WorkbenchRunnableAdapter;
+import org.eclipse.jdt.internal.ui.preferences.JavaPreferencesSettings;
+import org.eclipse.jdt.internal.ui.util.BusyIndicatorRunnableContext;
+import org.eclipse.jdt.internal.ui.viewsupport.BasicElementLabels;
+import org.eclipse.jdt.ui.JavaElementLabels;
+import org.eclipse.jface.dialogs.IDialogConstants;
+import org.eclipse.jface.dialogs.MessageDialog;
+import org.eclipse.jface.operation.IRunnableContext;
+import org.eclipse.jface.window.Window;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.ui.PlatformUI;
+
+@SuppressWarnings("restriction")
+public class GetterSetterGenerator {
+
+	public IMethod getSetter(IField field){
+		IMethod setter = null;
+		try {
+			setter = GetterSetterUtil.getGetter(field);
+			if(setter!=null){
+				AccessModifierChanger accessChanger = new AccessModifierChanger(setter);
+				accessChanger.change();
+			}else{
+				setter = this.generateS(field);
+			}
+			
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		
+		return setter;
+	}
+
+	public IMethod getGetter(IField field){
+		IMethod getter = null;
+		try {
+			getter = GetterSetterUtil.getGetter(field);
+			if(getter!=null){
+				AccessModifierChanger accessChanger = new AccessModifierChanger(getter);
+				accessChanger.change();
+			}else{
+				getter = this.generateG(field);
+			}
+			
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return getter;
+	}
+	
+	private IMethod generateG(IField field){
+		
+		
+		IType type = field.getDeclaringType();
+		IPackageFragment package1 = type.getPackageFragment();
+		ICompilationUnit cu = package1.getCompilationUnit(type.getElementName() + ".java");
+		
+		IField[] getters = new IField[1];
+		IField[] setters = new IField[0];
+		IField[] accessors = new IField[0];
+		getters[0] = field;
+		CompilationUnit unit = new RefactoringASTParser(AST.JLS4).parse(type.getCompilationUnit(), true);
+		
+		boolean apply = true;
+		boolean save = true;
+		IRequestQuery skipExistingQuery = this.skipReplaceQuery();
+		IJavaElement insert = null;
+		CodeGenerationSettings settings= JavaPreferencesSettings.getCodeGenerationSettings(cu.getJavaProject());
+		settings.createComments= true;
+		
+		IRunnableContext context= JavaPlugin.getActiveWorkbenchWindow();
+		if (context == null) {
+			context= new BusyIndicatorRunnableContext();
+		}
+		
+		
+		
+		
+		IMethod createdGetter = null;
+		try {
+			AddGetterSetterOperation op= new AddGetterSetterOperation
+					(type, getters, setters, accessors, unit, skipExistingQuery, insert, settings, apply, save);
+			this.setOperationStatusFields(op);
+			op.run(new NullProgressMonitor());
+			
+			package1 = type.getPackageFragment();
+			cu = package1.getCompilationUnit(type.getElementName() + ".java");
+			unit = new RefactoringASTParser(AST.JLS4).parse(type.getCompilationUnit(), true);
+			String fieldName = field.getElementName().substring(0, 1).toUpperCase() 
+					+ field.getElementName().substring(1, field.getElementName().length());
+			createdGetter = unit.getTypeRoot().findPrimaryType().getMethod("get" + fieldName, new String[0]);
+		} catch (CoreException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return createdGetter;
+		
+	}
+	
+	
+	private IMethod generateS(IField field){
+		
+		
+		IType type = field.getDeclaringType();
+		IPackageFragment package1 = type.getPackageFragment();
+		ICompilationUnit cu = package1.getCompilationUnit(type.getElementName() + ".java");
+		
+		IField[] getters = new IField[0];
+		IField[] setters = new IField[1];
+		IField[] accessors = new IField[0];
+		setters[0] = field;
+		CompilationUnit unit = new RefactoringASTParser(AST.JLS4).parse(type.getCompilationUnit(), true);
+		
+		boolean apply = true;
+		boolean save = true;
+		IRequestQuery skipExistingQuery = this.skipReplaceQuery();
+		IJavaElement insert = null;
+		CodeGenerationSettings settings= JavaPreferencesSettings.getCodeGenerationSettings(cu.getJavaProject());
+		settings.createComments= true;
+		
+		IRunnableContext context= JavaPlugin.getActiveWorkbenchWindow();
+		if (context == null) {
+			context= new BusyIndicatorRunnableContext();
+		}
+		
+		
+		
+		
+		IMethod createdSetter = null;
+		try {
+			AddGetterSetterOperation op= new AddGetterSetterOperation
+					(type, getters, setters, accessors, unit, skipExistingQuery, insert, settings, apply, save);
+			this.setOperationStatusFields(op);
+			op.run(new NullProgressMonitor());
+			
+			package1 = type.getPackageFragment();
+			cu = package1.getCompilationUnit(type.getElementName() + ".java");
+			unit = new RefactoringASTParser(AST.JLS4).parse(type.getCompilationUnit(), true);
+			String[] param = new String[1];
+			param[0] = Signature.getSignatureSimpleName(field.getTypeSignature());
+			String fieldName = field.getElementName().substring(0, 1).toUpperCase() 
+					+ field.getElementName().substring(1, field.getElementName().length());
+			createdSetter = unit.getTypeRoot().findPrimaryType().getMethod("set" + fieldName, param);
+		} catch (CoreException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return createdSetter;
+		
+	}
+
+	private void setOperationStatusFields(AddGetterSetterOperation op) {
+		// Set the status fields corresponding to the visibility and modifiers set
+		int flags= Modifier.PUBLIC;
+		
+		op.setSort(true);
+		op.setVisibility(flags);
+	}
+	
+//	private void More ...setOperationStatusFields(AddGetterSetterOperation op) {
+//	// Set the status fields corresponding to the visibility and modifiers set
+//	int flags= fVisibility;
+//	if (fSynchronized) {
+//	flags|= Flags.AccSynchronized;
+//	}
+//	if (fFinal) {
+//	flags|= Flags.AccFinal;
+//	}
+//	op.setSort(fSort);
+//	op.setVisibility(flags);
+//	}
+	
+	
+	private IRequestQuery skipReplaceQuery() {
+		return new IRequestQuery() {
+		
+		public int doQuery(IMember method) {
+		int[] returnCodes= { IRequestQuery.YES, IRequestQuery.NO, IRequestQuery.YES_ALL, IRequestQuery.CANCEL};
+		String skipLabel= ActionMessages.AddGetterSetterAction_SkipExistingDialog_skip_label; 
+		String replaceLabel= ActionMessages.AddGetterSetterAction_SkipExistingDialog_replace_label; 
+		String skipAllLabel= ActionMessages.AddGetterSetterAction_SkipExistingDialog_skipAll_label; 
+		String[] options= { skipLabel, replaceLabel, skipAllLabel, IDialogConstants.CANCEL_LABEL};
+		String methodName= JavaElementLabels.getElementLabel(method, JavaElementLabels.M_PARAMETER_TYPES);
+		String formattedMessage= Messages.format(ActionMessages.AddGetterSetterAction_SkipExistingDialog_message, BasicElementLabels.getJavaElementName(methodName)); 
+		return showQueryDialog(formattedMessage, options, returnCodes);
+		}
+		};
+		}
+		
+		private int showQueryDialog(final String message, final String[] buttonLabels, int[] returnCodes) {
+		final Shell shell= new Shell();
+		if (shell == null) {
+		JavaPlugin.logErrorMessage("AddGetterSetterAction.showQueryDialog: No active shell found"); //$NON-NLS-1$
+		return IRequestQuery.CANCEL;
+		}
+		final int[] result= { Window.CANCEL};
+		shell.getDisplay().syncExec(new Runnable() {
+		
+		public void run() {
+		String title= ActionMessages.AddGetterSetterAction_QueryDialog_title; 
+		MessageDialog dialog= new MessageDialog(shell, title, null, message, MessageDialog.QUESTION, buttonLabels, 0);
+		result[0]= dialog.open();
+		}
+		});
+		int returnVal= result[0];
+		return returnVal < 0 ? IRequestQuery.CANCEL : returnCodes[returnVal];
+		}
+		
+	private IMethod generateGetter(IField field) {
+		String buf = "";
+		String type = "";
+		buf+="public " + type + " get" + field.getElementName() + "(){ \n";
+		buf+="    return " + field.getElementName() + "; \n";
+		buf+="}";
+		return null;
+	}
+
+	private IMethod generateSetter(IField field) {
+		String buf = "";
+		String type  = "";
+		buf+="public void set" + field.getElementName() + "("+ type + " " + field.getElementName() + "){ \n";
+		buf+="    this." + field.getElementName() + " = "+ field.getElementName()+"; \n";
+		buf+="}";
+		return null;
+	}
+}

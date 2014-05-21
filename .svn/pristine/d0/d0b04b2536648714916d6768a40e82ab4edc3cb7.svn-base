@@ -1,0 +1,42 @@
+package zuna.refactoring.ui.operator;
+
+import java.util.Iterator;
+
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.Modifier.ModifierKeyword;
+
+import zuna.model.MyMethod;
+
+public class AccessModiferRewrite extends Rewrite{
+
+	public MethodDeclaration getMd() {
+		return md;
+	}
+	
+	public AccessModiferRewrite(MyMethod m){
+		super(m);
+	}
+	
+	public void rewrite(MyMethod m){
+		MethodDeclaration md = super.md;
+		modifyAccessedMethod(md);
+		save();
+	}
+	
+	private void modifyAccessedMethod(MethodDeclaration md){
+		MethodDeclaration newMd = astTarget.newMethodDeclaration();
+		newMd = (MethodDeclaration)ASTNode.copySubtree(newMd.getAST(), md);
+		Iterator iter = newMd.modifiers().iterator();
+		while(iter.hasNext()){
+			Object obj = iter.next();
+			Modifier mod = (Modifier) obj;
+			if(mod.getKeyword().toString().equals("private")){
+				mod.delete();
+				newMd.modifiers().add(this.astTarget.newModifier(ModifierKeyword.PUBLIC_KEYWORD));
+			}
+		}
+		rewriter.replace(md, newMd, null);
+	}
+}

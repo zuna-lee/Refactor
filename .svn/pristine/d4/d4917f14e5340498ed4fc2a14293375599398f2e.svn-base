@@ -1,0 +1,176 @@
+package zuna.mining.gap;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.jgap.FitnessFunction;
+import org.jgap.Gene;
+import org.jgap.IChromosome;
+
+import zuna.mining.ParameterPair;
+import zuna.model.MyParameter;
+
+public class MyFitnessFunction extends FitnessFunction {
+
+	private static final long serialVersionUID = 1L;
+
+	private Map<ParameterPair, Double> probabilityMap;
+	
+	public MyFitnessFunction(Map<ParameterPair, Double> probabilityMap) {
+		super();
+		this.probabilityMap = probabilityMap;
+	}
+
+	@Override
+	protected double evaluate(IChromosome a_subject) {
+		
+		double v = 0.0;
+//		int cnt = 0;
+//		for(Gene g: a_subject.getGenes()){
+//			cnt+=Integer.valueOf(g.getAllele().toString());
+//		}
+//		if(cnt>=a_subject.getGenes().length-1 || cnt<=0) return 0;
+	
+		
+		List<MyCluster> intraClusters = createIntraClusters(createParameterSetOfGroup(a_subject));
+		
+		List<MyCluster> interClusters = createInterClusters(intraClusters, createParameters(a_subject));
+		
+		for (int i = 0; i < intraClusters.size(); i++) {
+			
+			double intraQuality = intraClusters.get(i).getQuality();
+			double interQuality = interClusters.get(i).getQuality();
+			
+			double intraPlusInter = intraQuality + interQuality;
+			
+			v += (intraPlusInter == 0.0) ? 0.0 : (intraQuality / intraPlusInter);
+		}
+		
+		return v;
+	}
+	
+	private List<MyParameter> createParameters(IChromosome a_subject) {
+
+		List<MyParameter> parameters = new ArrayList<MyParameter>();
+		
+		Gene[] genes = a_subject.getGenes();
+		
+		for (Gene g : genes) {
+
+			if (g instanceof MyGene) {
+
+				MyGene myGene = (MyGene) g;
+				
+				MyParameter parameter = myGene.getParameter();
+				
+				parameters.add(parameter);
+			}
+		}
+		
+		return parameters;
+	}
+	
+	private Map<Integer, List<MyParameter>> createParameterSetOfGroup(IChromosome a_subject) {
+		
+		Map<Integer, List<MyParameter>> parameterSetOfGroup = new HashMap<Integer, List<MyParameter>>();
+		
+		Gene[] genes = a_subject.getGenes();
+
+		for (Gene g : genes) {
+			
+			if (g instanceof MyGene) {
+			
+				MyGene myGene = (MyGene) g;
+				
+				MyParameter parameter = myGene.getParameter();
+				
+				Integer key = (Integer) myGene.getAllele();
+				
+				List<MyParameter> parameterSet = parameterSetOfGroup.get(key);
+				
+				if (parameterSetOfGroup.containsKey(key)) {
+					
+					parameterSet.add(parameter);
+				}
+				else {
+					
+					parameterSet = new ArrayList<MyParameter>();
+					
+					parameterSet.add(parameter);
+					
+					parameterSetOfGroup.put(key, parameterSet);
+				}
+			}
+		}
+		
+		return parameterSetOfGroup;
+	}
+
+	private List<MyCluster> createIntraClusters(Map<Integer, List<MyParameter>> parameterSetOfGroup) {
+		
+		List<MyCluster> clusters = new ArrayList<MyCluster>();
+		
+		Set<Integer> keySet = parameterSetOfGroup.keySet();
+		
+		for (Integer key : keySet) {
+			
+			List<MyParameter> parameterSet = parameterSetOfGroup.get(key);
+			
+			MyCluster cluster = new MyCluster();
+			
+			cluster.setParameterPairs(ParameterPair.createParameterPairs(parameterSet));
+			
+			cluster.calculateQuality(probabilityMap);
+			
+			clusters.add(cluster);
+		}
+		
+		return clusters;
+	}
+	
+	private List<MyCluster> createInterClusters(List<MyCluster> intraClusters, List<MyParameter> parameters) {
+		
+		List<MyCluster> clusters = new ArrayList<MyCluster>();
+		
+		for (MyCluster myCluster : intraClusters) {
+			
+			MyCluster cluster = new MyCluster();
+			
+			cluster.setParameterPairs(ParameterPair.createParameterPairs(myCluster.getParameters(), parameters));
+			
+			cluster.calculateQuality(probabilityMap);
+			
+			clusters.add(cluster);
+		}
+		
+		return clusters;
+	}
+
+//	private MyCluster createInterCluster(List<ParameterPair> parameterPairs, List<MyCluster> clusters) {
+//		
+//		for (MyCluster myCluster : clusters) {
+//			
+//			List<ParameterPair> pairSet = myCluster.getParameterPairs();
+//			
+//			for (ParameterPair p : pairSet) {
+//
+//				parameterPairs.remove(p);
+//				
+//				p.swap();
+//				
+//				parameterPairs.remove(p);
+//			}
+//		}
+//		
+//		MyCluster interCluster = new MyCluster();
+//		
+//		interCluster.setParameterPairs(parameterPairs);
+//		
+//		interCluster.calculateQuality(probabilityMap);
+//		
+//		return interCluster;
+//	}
+}

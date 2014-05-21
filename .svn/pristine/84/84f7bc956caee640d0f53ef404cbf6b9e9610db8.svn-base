@@ -1,0 +1,142 @@
+
+package zuna.refactoring.ui.views.classDecomposesrViews.graph;
+
+import java.util.ArrayList;
+import java.util.Vector;
+
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTParser;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
+import org.eclipse.jdt.core.refactoring.descriptors.ExtractClassDescriptor;
+import org.eclipse.jface.text.BadLocationException;
+import org.eclipse.jface.text.Document;
+import org.eclipse.text.edits.MalformedTreeException;
+import org.eclipse.text.edits.TextEdit;
+
+import zuna.model.MyClass;
+import zuna.model.MyField;
+import zuna.model.MyMethod;
+import zuna.refactoring.ProjectAnalyzer;
+
+public class ExtractionHelper {
+
+	private Vector<Vector<String>> clusters = new Vector<Vector<String>>();
+	
+	public static CompilationUnit parse(ICompilationUnit unit) {
+		ASTParser parser = ASTParser.newParser(AST.JLS4);
+		parser.setKind(ASTParser.K_COMPILATION_UNIT);
+		parser.setSource(unit);
+		parser.setResolveBindings(true);
+		parser.setStatementsRecovery(true);
+		parser.setBindingsRecovery(true);
+		
+		return (CompilationUnit) parser.createAST(null);
+	}
+	
+	public static void save(ASTRewrite rewriter, ICompilationUnit unit) {
+		try {
+			TextEdit edits = rewriter.rewriteAST();
+			Document document = new Document(unit.getSource());
+			edits.apply(document);
+			// this is the code for adding statements
+			unit.getBuffer().setContents(document.get());
+			unit.commitWorkingCopy(false, null);
+		} catch (JavaModelException | MalformedTreeException | BadLocationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	
+	public ExtractionHelper(Vector<Vector<String>> clusters) {
+		this.clusters = clusters;
+	}
+
+	public int getNoneExtractedClusterIDX(){
+		int minIDX = -1;
+		int min = 1000000;
+		
+		for(int idx = 0 ; idx <  clusters.size() ; idx++){
+			
+			
+			if(clusters.get(idx).size()<min){
+				min = clusters.get(idx).size();
+				minIDX = idx;
+			}
+		}
+		
+		return minIDX;
+	}
+	
+	
+	public ArrayList<MyMethod> convert2MyMethod(Vector<String> cluster){
+		ArrayList<MyMethod> returnCluster = new ArrayList<MyMethod>();
+		for(int k = 0 ; k < cluster.size() ; k++){
+			String key = cluster.get(k);
+			if(ProjectAnalyzer.project.getMethodList().containsKey(key)){
+				MyMethod m = ProjectAnalyzer.project.getMethodList().get(key);
+				returnCluster.add(m);
+			}
+		}
+		return returnCluster;
+	}
+	
+	
+	public ArrayList<MyField> convert2MyField(Vector<String> cluster){
+		ArrayList<MyField> returnCluster = new ArrayList<MyField>();
+		for(int k = 0 ; k < cluster.size() ; k++){
+			String key = cluster.get(k);
+			if(ProjectAnalyzer.project.getFieldList().containsKey(key)){
+				MyField m = ProjectAnalyzer.project.getFieldList().get(key);
+				returnCluster.add(m);
+			}
+		}
+		return returnCluster;
+	}
+	
+	public static String getFileName(MyClass oldClass){
+		String newClassName = getClassName(oldClass);
+		String newFileName = newClassName + ".java";
+		
+		return newFileName;
+	}
+	public static String getFileName(MyClass oldClass, int idx){
+		String newClassName = getClassName(oldClass, idx);
+		String newFileName = newClassName + ".java";
+		
+		return newFileName;
+	}
+	public static String getClassName(MyClass oldClass){
+		String[] name = oldClass.getID().split("\\.");
+		String newClassName = name[name.length-1];
+		
+		return newClassName;
+	}
+	public static String getClassName(MyClass oldClass, int idx){
+		String[] name = oldClass.getID().split("\\.");
+		String newClassName = name[name.length-1] +"_extracted_" + idx;
+		
+		return newClassName;
+	}
+	
+	public static ExtractClassDescriptor.Field[] getFields(ArrayList<String> fieldNames, IType type) throws JavaModelException{
+		ExtractClassDescriptor.Field[] fields = ExtractClassDescriptor.getFields(type);
+		ExtractClassDescriptor.Field[] adjustedFields = new ExtractClassDescriptor.Field[fields.length];
+			
+		for(int i =  0 ; i < fields.length ; i++){
+			adjustedFields[i] = fields[i];
+			if(fieldNames.contains(fields[i].getFieldName())){
+				adjustedFields[i].setCreateField(true);
+			}else{
+				adjustedFields[i].setCreateField(false);
+			}
+		}
+		
+		return adjustedFields;
+	}
+	
+}

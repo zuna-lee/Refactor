@@ -1,0 +1,170 @@
+package zuna.parser;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+
+import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTMatcher;
+import org.eclipse.jdt.core.dom.ASTParser;
+import org.eclipse.jdt.core.dom.Block;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+
+import zuna.model.MyMethod;
+
+public class ASTParserUtil {
+
+	/**
+	 * <p>
+	 * Check if the bodies of two methods are equal.
+	 * </p>
+	 * 
+	 * @param m1
+	 * @param m2
+	 * @return True if the body of the two methods are equal or if there are no bodies. Else, false.
+	 */
+	public static boolean bodiesAreEqual(MethodDeclaration m1, MethodDeclaration m2) {
+		final ASTMatcher matcher = new ASTMatcher();
+		boolean equals = true;
+		Block body1 = m1.getBody();
+		Block body2 = m2.getBody();
+	
+		if (body1 != null && body2 != null) {
+			equals = body1.subtreeMatch(matcher, body2);
+		} else {
+			equals = body1 == null && body2 == null;
+		}
+		return equals;
+	}
+
+	public static CompilationUnit parse(String str) {
+		ASTParser parser = ASTParser.newParser(AST.JLS3);
+		parser.setSource(str.toCharArray());
+		parser.setKind(ASTParser.K_COMPILATION_UNIT);
+	
+		final CompilationUnit cu = (CompilationUnit) parser.createAST(null);
+		return cu;
+	}
+
+	//read file content into a string
+	public static String readFileToString(String filePath) throws IOException {
+		StringBuilder fileData = new StringBuilder(1000);
+		BufferedReader reader = new BufferedReader(new FileReader(filePath));
+	
+		char[] buf = new char[10];
+		int numRead = 0;
+		while ((numRead = reader.read(buf)) != -1) {
+			System.out.println(numRead);
+			String readData = String.valueOf(buf, 0, numRead);
+			fileData.append(readData);
+			buf = new char[1024];
+		}
+	
+		reader.close();
+	
+		return  fileData.toString();	
+	}
+
+	public static void findDiffClass(TypeDeclaration ver1Class,
+			TypeDeclaration ver2Class) {
+		String method1FullName = null;
+		String method2FullName = null;
+		MethodDeclaration ver2Md = null;
+		
+		for (MethodDeclaration ver1Md : ver1Class.getMethods()) {	
+			ver2Md = null;
+			method1FullName = MyMethod.makeMethodFullName(ver1Md.resolveBinding());
+	
+			for (MethodDeclaration md2 : ver2Class.getMethods()) {	
+				method2FullName = MyMethod.makeMethodFullName(md2.resolveBinding());
+				if(method1FullName.equals(method2FullName)) {
+					ver2Md = md2;
+					break;
+				}
+			}
+			
+			if(ver2Md == null) {
+				System.out.println("Deleted Method : " + method1FullName);
+				continue;
+			}
+			
+			if(ver1Md.getBody() == null)
+				continue;
+	
+			if(!bodiesAreEqual(ver1Md, ver2Md)) {
+				System.out.println("Modified Method : " + method1FullName);
+			} else {
+				System.out.println("Not modified Method : " + method1FullName);
+			}
+		}
+		
+		//ver2Class에 추가된 메소드
+		for (MethodDeclaration ver1Md : ver2Class.getMethods()) {	
+			ver2Md = null;
+			method1FullName = MyMethod.makeMethodFullName(ver1Md.resolveBinding());
+	
+			for (MethodDeclaration md2 : ver1Class.getMethods()) {	
+				method2FullName = MyMethod.makeMethodFullName(md2.resolveBinding());
+				if(method1FullName.equals(method2FullName)) {
+					ver2Md = md2;
+					break;
+				}
+			}
+			if(ver2Md == null) {
+				System.out.println("Add Method : " + method1FullName);
+				continue;
+			}
+		}
+	}
+
+	public static boolean isModifiedMethod(MethodDeclaration ver1Md,
+			MethodDeclaration ver2Md) {
+		String method1FullName = null;
+		String method2FullName = null;
+			
+		if(ver2Md.getBody() == null)
+			if (ver1Md.getBody() == null) {
+				return false;
+		} else {
+			return true;
+		}
+	
+		return !bodiesAreEqual(ver1Md, ver2Md);
+	}
+	
+//	static public ArrayList<MyMethod> findDifferences(Repo ver1Proj,
+//			Repo ver2Proj) {
+//		int added = 0;
+//		int notChanged = 0;
+//		int changed = 0;
+//		ArrayList<MyMethod> differList = new ArrayList<MyMethod>();
+//		MyMethod ver1Md = null;
+//		
+//		for (MyMethod ver2Md : ver2Proj.getMethodList().values()) {
+//			if(ver2Md.isLibrary()) {
+//				continue;
+//			}
+//			ver1Md = ver1Proj.getMethod(ver2Md.getID());
+//			if(ver1Md == null) {
+//				System.out.println("Add Method : " + ver2Md.getID());
+//				differList.add(ver2Md);
+//				added++;
+//				continue;
+//			} else {
+//				if(ASTParserUtil.isModifiedMethod(ver1Md.getOrginType(), ver2Md.getOrginType())) {
+//					differList.add(ver2Md);
+//					System.out.println("Modified Method : "+  ver2Md.getID());
+//					changed++;
+//				} else {
+//					//System.out.println("Not Modified Method : " + ver2Md.getUri());
+//					notChanged++;
+//				}
+//			}
+//		}
+//		System.out.println("Result added[" + added +"] changed[" + changed + "] + notChanged[" + notChanged + "]");
+//		return differList;
+//	}
+
+}

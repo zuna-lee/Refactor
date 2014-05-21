@@ -1,0 +1,175 @@
+package zuna.refactoring.ui.actions;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.Hashtable;
+import java.util.Vector;
+
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.runtime.IAdaptable;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.jdt.internal.core.CompilationUnit;
+import org.eclipse.jface.operation.IRunnableWithProgress;
+import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.ui.IViewPart;
+import org.eclipse.ui.IViewReference;
+import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.PartInitException;
+import org.eclipse.ui.PlatformUI;
+
+import zuna.clustering.HAC.HierarchicalClustering;
+import zuna.metric.classDS.ArchitectureBasedDS;
+import zuna.metric.classDS.ClassCouplingBasedDS;
+import zuna.metric.classDS.InheritanceBasedDS;
+import zuna.metric.cohesion.FCC;
+import zuna.model.MyClass;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.experiment.decompose.RealLargeClass;
+import zuna.refactoring.ui.views.DecomposedResultView;
+import zuna.refactoring.ui.views.classDecomposesrViews.ClassListView;
+
+@SuppressWarnings("restriction")
+public class AnalysisProgress implements IRunnableWithProgress{
+        private int workload;
+        private IStructuredSelection selection;
+        private IWorkbenchPage page;
+        public AnalysisProgress(IStructuredSelection selection, IWorkbenchPage page, int workload)
+        {
+            this.workload = workload;
+            this.selection = selection;
+            this.page = page;
+        }
+        
+		@Override
+        public void run(IProgressMonitor monitor) throws InvocationTargetException, InterruptedException
+        {
+            // Tell the user what you are doing
+            monitor.beginTask("Copying files", workload);
+
+            // Do your work
+            
+            
+			try{
+				
+		        Object firstElement = selection.getFirstElement();
+		        if (firstElement instanceof IAdaptable)
+		        {
+		        	if(firstElement instanceof CompilationUnit){
+						CompilationUnit cu = (CompilationUnit)firstElement;
+			            IProject project = (IProject) cu.getJavaProject().getProject();
+			            
+			            if(ProjectAnalyzer.prjName==null || !ProjectAnalyzer.prjName.equals(project.getName())){
+				            init();
+				            System.out.println(project.getName() + " has been started");
+			            	ProjectAnalyzer.analyze(project);
+			            }
+			            
+		            	String classID = getClassID(cu);
+		            	MyClass lc = ProjectAnalyzer.project.getClass(classID);
+			            RealLargeClass rc = new RealLargeClass(lc, project, new HierarchicalClustering());
+			            rc.analyze();
+			            DecomposedResultView.result.clear();
+			            Vector<Vector<String>> result = rc.getResult();
+			            if(result.size()>1){
+			            	DecomposedResultView.result = result;
+			            	PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().showView("zuna.refactoring.ui.views.DecomposedResultView");
+			            }
+			            
+		        	}else{
+		        		init();
+			            IProject project = (IProject)((IAdaptable)firstElement).getAdapter(IProject.class);
+			            ProjectAnalyzer.firstElement = (IAdaptable)firstElement;
+			            
+			            monitor.subTask(project.getName() + " has been started");
+			            ProjectAnalyzer.analyze(project);
+			            monitor.worked(80);
+			            ClassListView.flg=true;
+			            Display.getDefault().syncExec(new Runnable() {
+						    public void run() {
+						    	try {
+						    		IViewReference[] views = page.getViewReferences();
+						            for(int i = 0 ; i < views.length; i++){
+						            	if(views[i].getId().equals("refactoring.views.classDecomposesrViews.ClassListView")){
+						            		
+						            		final IViewPart view = views[i].getView(true);
+						                    if (view instanceof ClassListView) {
+						                        final ClassListView resultViewer = (ClassListView) view;
+						                        resultViewer.redraw();
+						                    }
+						            		break;
+										}
+						            }
+						            
+						            page.showView("refactoring.views.classDecomposesrViews.ClassListView");
+								} catch (PartInitException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								}
+						    }
+						});
+			            
+			            
+			            monitor.worked(20);
+			                    
+			            
+		        	}
+		        }
+//		            IFile file = (IFile)((IAdaptable)firstElement).getAdapter(IFile.class);
+//		            System.out.println(file.getFullPath());
+//		            new IterativeProcess4MeasuringCohesion(project).analyze();
+//		            new LongParameter(project).analyze();
+//		            MutatedLargeClass lc = new MutatedLargeClass(project, new HierarchicalClustering());
+//		            lc.analyze();
+//		            ProjectAnalyzer.analyze(project);
+//		            MyClass lc = ProjectAnalyzer.project.getClass("req_tracer.rcp.Editor.ChangImpactAnalyzerComponent");
+//		            RealLargeClass rc = new RealLargeClass(lc, project, new HierarchicalClustering());
+//		            rc.analyze();
+		            
+//		            lc.analyze();
+//		            new DivergentChange(project).analyze();
+//		            new FindBug(project).analyze();
+//		            ProjectAnalyzer.analyze(project);
+//		            MetricGetter.measureAll(project, new FCC(ProjectAnalyzer.project));
+//		            System.out.println("LSCC end");
+//		            ProjectAnalyzer.analyze(project);
+//		            MetricGetter.measureAll(project, new FCC(ProjectAnalyzer.project));
+//		            MetricGetter.measureAll(project, new LSCC(ProjectAnalyzer.project));
+
+
+//		            MyClass lc = ProjectAnalyzer.project.getClass("zuna.refactoring.operator.divergentChange.DivergentChange");
+//		            new RealLargeClass(lc, project, new HierarchicalClustering()).analyze();
+//		            System.out.println("FCC end");
+//		            ProjectAnalyzer.analyze(project);
+//		            MetricGetter.measureAll(project);
+//		            System.out.println("C3 end");
+
+			}catch(java.lang.NullPointerException | java.lang.ClassCastException |PartInitException e){
+				e.printStackTrace();
+			}
+			
+            monitor.done();
+        }
+
+        
+        private void init(){
+    		ProjectAnalyzer.project = null;
+    		FCC.max = -1;
+    		ArchitectureBasedDS.max = -1;
+    		InheritanceBasedDS.max = -1;
+    		ClassCouplingBasedDS.max = -1;
+    		ProjectAnalyzer.firstElement=null;
+    		ArchitectureBasedDS.dsTable = new Hashtable<String, Double>();
+    		InheritanceBasedDS.dsTable = new Hashtable<String, Double>();
+    		ClassCouplingBasedDS.dsTable = new Hashtable<String, Double>();
+    	}
+        
+        
+    	private String getClassID(CompilationUnit cu) {
+    		String classID = cu.getPath().toString().replace(cu.getPackageFragmentRoot().getPath().toString() + "/", "");
+    		classID = classID.replace("/", ".");
+    		classID = classID.substring(0, classID.length()-5);
+    		return classID;
+    	}
+
+    }
+

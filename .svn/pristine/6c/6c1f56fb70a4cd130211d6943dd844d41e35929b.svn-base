@@ -1,0 +1,112 @@
+package zuna.refactoring.ui.views.classDecomposesrViews;
+
+import java.util.Hashtable;
+
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Table;
+import org.eclipse.swt.widgets.TableColumn;
+import org.eclipse.swt.widgets.TableItem;
+import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.part.ViewPart;
+
+import zuna.model.MyClass;
+import zuna.refactoring.ProjectAnalyzer;
+
+public class MethodView extends ViewPart{
+
+	public static MyClass c;
+	
+	@Override
+	public void createPartControl(Composite parent) {
+		try{
+//			Vector<Double> rsVector = getMetric();
+			createTable(parent);
+		}catch(java.lang.NullPointerException e){
+			PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().hideView(this);
+		}
+	}
+
+	
+	
+	
+	private void createTable(Composite parent) {
+		
+		final Table table = new Table(parent, SWT.SINGLE | SWT.BORDER | SWT.FULL_SELECTION);
+        table.setLinesVisible(true);
+        table.setHeaderVisible(true);
+
+        GridData tableData = new GridData(GridData.FILL_BOTH);
+        tableData.horizontalSpan = 4;
+        tableData.verticalSpan = 3;
+        table.setLayoutData(tableData);
+
+		TableColumn column0 = new TableColumn(table, SWT.NONE);
+		column0.setText("Class");
+		column0.setWidth(400);
+		
+		
+		TableColumn column2 = new TableColumn(table, SWT.NONE);
+		column2.setText("IAS");
+		column2.setWidth(60);
+		
+		TableColumn column3 = new TableColumn(table, SWT.NONE);
+		column3.setText("IDC");
+		column3.setWidth(60);
+		
+		TableColumn column4 = new TableColumn(table, SWT.NONE);
+		column4.setText("IIC");
+		column4.setWidth(60);
+		
+		TableColumn column5 = new TableColumn(table, SWT.NONE);
+		column5.setText("IMS");
+		column5.setWidth(60);
+		
+		TableColumn column6 = new TableColumn(table, SWT.NONE);
+		column6.setText("EIC");
+		column6.setWidth(60);
+		
+		TableColumn column1 = new TableColumn(table, SWT.NONE);
+		column1.setText("ECD");
+		column1.setWidth(60);
+		
+		TableColumn column7 = new TableColumn(table, SWT.NONE);
+		column7.setText("RS");
+		column7.setWidth(60);
+
+		Hashtable<String, String> tmp = new Hashtable<String, String>();
+		System.out.println("==========================================");
+		
+		for(String key: ProjectAnalyzer.metrics.keySet()){
+			TableItem item = new TableItem(table, SWT.NONE);
+			item.setText(0, key);
+			item.setText(1, String.valueOf(ProjectAnalyzer.metrics.get(key).getIas()));
+			item.setText(2, String.valueOf(ProjectAnalyzer.metrics.get(key).getIdc()));
+			item.setText(3, String.valueOf(ProjectAnalyzer.metrics.get(key).getIic()));
+			item.setText(4, String.valueOf(ProjectAnalyzer.metrics.get(key).getIms()));
+			item.setText(5, String.valueOf(ProjectAnalyzer.metrics.get(key).getEic()));
+			item.setText(6, String.valueOf(ProjectAnalyzer.metrics.get(key).getEcd()));
+			item.setText(7, String.valueOf(ProjectAnalyzer.metrics.get(key).getRs()));
+			
+			System.out.println(key + ":" + ProjectAnalyzer.metrics.get(key).getIas()
+					+ ":" + ProjectAnalyzer.metrics.get(key).getIdc()
+					+ ":" + ProjectAnalyzer.metrics.get(key).getIic()
+					+ ":" + ProjectAnalyzer.metrics.get(key).getIms()
+					+ ":" + ProjectAnalyzer.metrics.get(key).getEic()
+					+ ":" + ProjectAnalyzer.metrics.get(key).getEcd()
+					+ ":" + ProjectAnalyzer.metrics.get(key).getRs()
+					);
+			
+		}
+		
+		
+	}
+
+	@Override
+	public void setFocus() {
+		// TODO Auto-generated method stub
+		
+	}
+
+}

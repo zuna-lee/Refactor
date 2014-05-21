@@ -1,0 +1,75 @@
+package zuna.refactoring.operator;
+
+import java.util.Hashtable;
+
+import org.eclipse.core.resources.IProject;
+
+import zuna.metric.cohesion.FCM;
+import zuna.metric.cohesion.LCOM4;
+import zuna.model.MyClass;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.util.Logger2Console;
+import zuna.util.Logger2File;
+
+public class MeasuringFCM extends Analyzer{
+
+	public MeasuringFCM(IProject iproject) {
+		super(iproject);
+	}
+
+	public void analyze(){
+		this.phase1();
+		this.phase2();
+	}
+	
+	private void phase2() {
+
+	    Hashtable<MyClass, String> metrics = new Hashtable<MyClass, String>();
+		for(int iter = 0 ; iter < 4;iter++){
+			for(String key: ProjectAnalyzer.project.getClassList().keySet()){
+				
+		    	MyClass c = ProjectAnalyzer.project.getClassList().get(key);
+		    	if(!c.isLibrary() && c.getOwnedMethods().size()>1){
+
+		    		
+		    		FCM fcm = new FCM(ProjectAnalyzer.project);
+		    		fcm.identifyRMGs(c);
+		    	}
+		    }
+			System.out.print("Iteration: " + iter + ":");
+			Logger2Console.CMGCheck();
+			
+		}
+		
+		
+		
+		for(String key: ProjectAnalyzer.project.getClassList().keySet()){
+			FCM fcm = new FCM(ProjectAnalyzer.project);
+	    	MyClass c = ProjectAnalyzer.project.getClassList().get(key);
+	    	
+	    	if(!c.isLibrary()){
+		    	double value = fcm.getMetric(c);
+		    	if(metrics.containsKey(c)){
+					String t = metrics.get(c) + "," + String.valueOf(value);
+					metrics.put(c, t);
+				}else{
+					metrics.put(c, String.valueOf(value));
+				}
+	    	}
+		}
+		
+		Logger2File.print2CSVFile(metrics, ProjectAnalyzer.prjName);
+	}
+	
+	private void phase1(){
+		
+		LCOM4 lcom4 = new LCOM4(ProjectAnalyzer.project);
+		for(String key: ProjectAnalyzer.project.getClassList().keySet()){
+	    	MyClass c = ProjectAnalyzer.project.getClassList().get(key);
+	    	if(!c.isLibrary()){
+	    		lcom4.identifyRMGs(c);
+	    	}
+		}
+		
+	}
+}

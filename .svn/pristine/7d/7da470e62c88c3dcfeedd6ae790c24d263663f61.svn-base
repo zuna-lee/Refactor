@@ -1,0 +1,50 @@
+package zuna.refactoring.code;
+
+import java.util.HashSet;
+
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.ui.actions.OrganizeImportsAction;
+import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.jface.viewers.StructuredSelection;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.ui.IWorkbenchPartSite;
+import org.eclipse.ui.IWorkbenchSite;
+
+
+public class ImportChanger {
+
+	
+	HashSet<ICompilationUnit> changedUnits = new HashSet<ICompilationUnit>();
+	IWorkbenchPartSite targetSite;
+	public ImportChanger(HashSet<ICompilationUnit> changedUnits, IWorkbenchPartSite targetSite){
+		this.changedUnits = changedUnits;
+		this.targetSite = targetSite;
+	}
+	
+	public void change(){
+		try {
+			    if(targetSite!=null){ 
+			    organizeImports(targetSite);
+			    }
+
+			} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			}
+	}
+	
+	public void organizeImports(final IWorkbenchSite targetSite) throws CoreException {
+		Runnable job = new Runnable() {
+			@Override
+			public void run() {
+			    OrganizeImportsAction org = new OrganizeImportsAction(targetSite);
+		        for(ICompilationUnit unit: changedUnits){
+		        	IStructuredSelection selection = new StructuredSelection(unit);
+			        org.run(selection);
+		        }
+			}
+		};
+		Display.getDefault().syncExec(job);
+	}
+}

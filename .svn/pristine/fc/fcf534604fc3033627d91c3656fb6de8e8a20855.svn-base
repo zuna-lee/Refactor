@@ -1,0 +1,32 @@
+package zuna.refactoring.operator;
+
+
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.Path;
+import org.eclipse.ui.IEditorPart;
+import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.PartInitException;
+import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.ide.IDE;
+
+import zuna.model.MyClass;
+
+public class OperatorUtils {
+
+	
+	public static void openFile(MyClass source, IProject prj) {
+        String fileURL = "/src/" + source.getDeclaration().resolveBinding().getQualifiedName().replace('.','/') + ".java";
+        IFile theFile = prj.getFile(fileURL);
+        ResourcesPlugin.getWorkspace().getRoot().getFileForLocation(Path.fromOSString(theFile.getFullPath().toString()));
+        IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+        try {
+			IEditorPart openEditor = IDE.openEditor(page, theFile);
+		} catch (PartInitException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+}

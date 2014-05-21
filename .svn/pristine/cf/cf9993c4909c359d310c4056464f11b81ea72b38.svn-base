@@ -1,0 +1,128 @@
+package zuna.refactoring.experiment;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Set;
+
+import org.eclipse.core.resources.IProject;
+
+import zuna.mining.AssociationMiningTool;
+import zuna.mining.AssociationMiningTool.MethodSet;
+import zuna.mining.Database;
+import zuna.mining.LongParameterAnalyer;
+import zuna.model.MyClass;
+import zuna.model.MyIdentifier;
+import zuna.model.MyMethod;
+import zuna.model.MyParameter;
+import zuna.refactoring.ProjectAnalyzer;
+
+public class LongParameter extends Analyzer{
+
+	public LongParameter(IProject iproject) {
+		super(iproject);
+	}
+	
+	public void analyze(){
+		//this.constructCorpus();
+		
+		LongParameterAnalyer analyer = new LongParameterAnalyer(getNotLibMethods());
+		
+		analyer.analyze();
+//		
+//		Map<ParameterPair, Double> resultMap = analyer.getProbabilityMap();
+//		
+//		Set<ParameterPair> keySet = resultMap.keySet();
+//		
+//		for (ParameterPair parameterPair : keySet) {
+//			
+//			Double p = resultMap.get(parameterPair);
+//			
+//			System.out.print(parameterPair.getFirst().getName());
+//			System.out.print("\t");
+//			System.out.print(parameterPair.getSecond().getName());
+//			System.out.print("\t");
+//			System.out.print(p);
+//			System.out.print("\n");
+//		}
+//		
+//		System.out.println("size : " + analyer.getProbabilityMap().size());
+	}
+
+	private void constructCorpus() {
+		AssociationMiningTool tool = new AssociationMiningTool();
+		List<Database> databases = getDatabases();
+		List<String> terms = getTerms();
+		tool.init(databases, terms);
+		tool.makeCorpus();
+		Hashtable<String, MethodSet> params = tool.getMethodSets();
+	}
+	
+	private List<MyMethod> getNotLibMethods() {
+		
+		List<MyMethod> methods = new ArrayList<MyMethod>();
+		
+		HashMap<String, MyMethod> methodList = ProjectAnalyzer.project.getMethodList();
+		
+		Set<String> keySet = methodList.keySet();
+		
+		for (String key : keySet) {
+			
+			MyMethod myMethod = methodList.get(key);
+			
+			if (!myMethod.getParent().isLibrary()) {
+				
+				methods.add(myMethod);
+			}
+		}
+		
+		return methods;
+	}
+	
+	private List<Database> getDatabases() {
+		
+		List<Database> databases = new ArrayList<>();
+		HashMap<String, MyClass> classes = ProjectAnalyzer.project.getClassList();
+		
+		for (String key : classes.keySet()) {
+			MyClass c = classes.get(key);
+			if(!c.isLibrary()){
+				ArrayList<MyMethod> methods = c.getOwnedMethods();
+				
+				for (MyMethod m : methods) {
+					MyIdentifier identifier = m.getIdentifier();
+
+					Database database = new Database();
+					
+					database.setId(m.getID());
+					database.setItem(identifier);
+					
+					databases.add(database);
+				}
+			}
+		}
+		
+		return databases;
+	}
+	
+	
+	private List<String> getTerms() {
+		
+		List<String> parameters = new ArrayList<String>();;
+		
+		HashMap<String, MyParameter> map = ProjectAnalyzer.project.getParameterList();
+		
+		for (String key : map.keySet()) {
+			
+			MyParameter parameter = map.get(key);
+			
+			parameters.add(parameter.getName());
+		}
+		
+		return parameters;
+	}
+
+
+
+}

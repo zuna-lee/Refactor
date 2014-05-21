@@ -1,0 +1,124 @@
+package zuna.metric.cohesion;
+
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+
+import org.apache.commons.math3.stat.descriptive.rank.Max;
+
+import zuna.metric.LLDMetric;
+import zuna.metric.Metric;
+import zuna.metric.classDS.ArchitectureBasedDS;
+import zuna.metric.classDS.ClassCouplingBasedDS;
+import zuna.metric.classDS.InheritanceBasedDS;
+import zuna.model.MyClass;
+import zuna.model.MyMethod;
+import zuna.model.Repo;
+
+public class FCCAll  extends Metric implements LLDMetric{
+	
+	private ArchitectureBasedDS dsa;
+	private InheritanceBasedDS dsi;
+	private ClassCouplingBasedDS dsc;
+	
+	public FCCAll(Repo p) {
+		super(p);
+		
+		if(ArchitectureBasedDS.max == -1){
+			System.out.println("DS Analyze Start");
+			dsa = new ArchitectureBasedDS();
+			System.out.println("Architectural DS Analyze End");
+			dsi = new InheritanceBasedDS();
+			System.out.println("Inheritance Analyze Start");
+			dsc = new ClassCouplingBasedDS();
+			System.out.println("Coupling Analyze End");
+		}
+	}
+
+	@Override
+	public double getMetric(MyClass c) {
+		ArrayList<MyMethod> methods =  c.getOwnedMethods();
+		double fcm = 0.0;
+		double pairCnt = 0.0;
+		
+		if(methods.size()<2) return 1;
+		
+		for(int i = 0 ; i < methods.size()-1 ; i++){
+			for(int j = i+1 ; j < methods.size() ; j++){
+				MyMethod m1 = methods.get(i);
+				MyMethod m2 = methods.get(j);
+				boolean abst1 = Modifier.isAbstract(m1.getMd().resolveBinding().getModifiers());
+				boolean cons1 = m1.getMd().resolveBinding().isConstructor();
+				boolean abst2 = Modifier.isAbstract(m2.getMd().resolveBinding().getModifiers());
+				boolean cons2 = m2.getMd().resolveBinding().isConstructor();
+				
+				if(!(abst1 || abst2 || cons1 || cons2)){
+					fcm += getMetric(m1, m2);
+					pairCnt++;
+				}
+			}
+		}
+		
+		return fcm/pairCnt;
+	}
+
+	public double getMetric(MyMethod m1, MyMethod m2){
+		ArrayList<MyMethod> out1 = m1.getFanOut();
+		ArrayList<MyMethod> out2 = m2.getFanOut();
+		
+		ArrayList<MyMethod> in1 = m1.getFanIn();
+		ArrayList<MyMethod> in2 = m2.getFanIn();
+		
+		double out = this.getMetric(out1, out2, true);
+		
+		return out;
+	}
+
+	private double getMetric(ArrayList<MyMethod> out1, ArrayList<MyMethod> out2, boolean flg){
+		double ds1 = 0.0;
+		double ds2 = 0.0;
+		double ds3 = 0.0;
+		double ds = 0.0;
+		double cnt = 0;
+		
+		for(MyMethod o1: out1){
+			for(MyMethod o2: out2){
+//				double e = 0.0;
+//				if(o1.getParent().getNoOfCalls() > o2.getParent().getNoOfCalls()) {
+//					e = 1 / (double)o1.getParent().getNoOfCalls();
+//					if(Double.isNaN(e) || Double.isInfinite(e)) e = 0;
+//				}else {
+//					e = 1 / (double)o2.getParent().getNoOfCalls();
+//					if(Double.isNaN(e) || Double.isInfinite(e)) e = 0;
+//				}
+				
+				if(o1.getParent()!=null && o2.getParent()!=null){// && !o1.getParent().isLibrary()
+//						 && !o2.getParent().isLibrary()){
+
+					++cnt;
+//					 && o1.getParent().getNoOfCalls()>ProjectAnalyzer.avgIDF
+//					 && o2.getParent().getNoOfCalls()>ProjectAnalyzer.avgIDF
+//						&& !o1.getParent().isInterface() && !o2.getParent().isInterface()){
+					
+					ds1 = dsa.DS(o1.getParent(), o2.getParent());
+					ds2 = dsi.DS(o1.getParent(), o2.getParent());
+					ds3 = dsc.DS(o1.getParent(), o2.getParent());
+					double[] dss = new double[3];
+					dss[0] = ds1;
+					dss[1] = ds2;
+					dss[2] = ds3;
+					double m_ds = new Max().evaluate(dss);
+					if(flg)
+						ds+=m_ds;
+					else ds+=m_ds;
+				}
+			}
+		}
+//		new DescriptiveStatistics();
+		double value =0.0;
+		value = ds/cnt;
+		if(Double.isNaN(value)) return 0.0;
+		else return value;
+	}
+
+
+}

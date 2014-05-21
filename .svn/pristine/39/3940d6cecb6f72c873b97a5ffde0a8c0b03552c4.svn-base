@@ -1,0 +1,314 @@
+package zuna.refactoring.operator;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.Vector;
+
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.core.runtime.OperationCanceledException;
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.ImportDeclaration;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
+import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
+import org.eclipse.jdt.core.refactoring.descriptors.ExtractClassDescriptor;
+import org.eclipse.jdt.internal.core.refactoring.descriptors.RefactoringSignatureDescriptorFactory;
+import org.eclipse.jdt.internal.corext.refactoring.structure.ExtractClassRefactoring;
+import org.eclipse.jface.operation.IRunnableWithProgress;
+import org.eclipse.jface.text.BadLocationException;
+import org.eclipse.jface.text.Document;
+import org.eclipse.ltk.core.refactoring.Change;
+import org.eclipse.ltk.core.refactoring.Refactoring;
+import org.eclipse.text.edits.MalformedTreeException;
+import org.eclipse.text.edits.TextEdit;
+import org.eclipse.ui.IWorkbenchPartSite;
+
+import zuna.model.MyClass;
+import zuna.model.MyField;
+import zuna.model.MyMethod;
+import zuna.parser.visitor.AbstractTypeDeclarationVisitor;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.code.AccessModifierChanger;
+import zuna.refactoring.code.Caller;
+import zuna.refactoring.code.ClassCreateChanger;
+import zuna.refactoring.code.FieldChanger;
+import zuna.refactoring.code.ImportChanger;
+import zuna.refactoring.code.InternalInvocationChanger;
+import zuna.refactoring.code.MethodMoveChanger;
+import zuna.refactoring.code.PointerChanger;
+import zuna.refactoring.ui.views.classDecomposesrViews.graph.ExtractionHelper;
+
+@SuppressWarnings("restriction")
+public class ExtractClassProgress implements IRunnableWithProgress{
+
+	private Vector<Vector<String>> result = new Vector<Vector<String>>();
+	private HashSet<ICompilationUnit> changedUnits = new HashSet<ICompilationUnit>();
+	private IWorkbenchPartSite targetSite;
+	public ExtractClassProgress(Vector<Vector<String>> result, IWorkbenchPartSite targetSite){
+		this.result = result;
+		this.targetSite = targetSite;
+	}
+	
+	@Override
+	public void run(IProgressMonitor monitor) throws InvocationTargetException, InterruptedException{
+		MyMethod m = ProjectAnalyzer.project.getMethodList().get(result.get(0).get(0));
+		MyClass oldClass = m.getParent();
+		monitor.beginTask(oldClass.getID() + " is being split into " + result.size() + " groups.", result.size()*100);
+		
+	    
+	    ExtractionHelper typeChecker = new ExtractionHelper(result);
+	    int noneExtractedCluster = typeChecker.getNoneExtractedClusterIDX();
+	    for(int i = 0 ; i < result.size() ; i++){
+	    	monitor.subTask("cluster " + i + " is being extracted.");
+	    	if(i!=noneExtractedCluster){
+	    		Vector<String> cluster = result.get(i);
+		    	ArrayList<MyField> fields = typeChecker.convert2MyField(cluster);
+		    	ArrayList<String> extractedFieldNames = new ArrayList<String>();
+		    	
+		    	if(fields.size()>0){
+		    		for(MyField f: fields){
+		    			oldClass = f.getParent();
+		    			String[] token = f.getID().split("\\.");
+		    			String fName = token[token.length-1];
+		    			extractedFieldNames.add(fName);
+		    		}
+		    		
+					try {
+						monitor.subTask("New Class is being created.");
+						ExtractClassDescriptor.Field[] extractedFields = ExtractionHelper.getFields(extractedFieldNames, oldClass.getCu().getTypeRoot().findPrimaryType());
+						MyClass newClass = this.activateExtractClassWithFields(extractedFields, oldClass, ExtractionHelper.getClassName(oldClass, i));
+						this.moveMethods(this.getMyMethodList(cluster), oldClass, newClass, monitor, i);
+
+					} catch (CoreException e1) {
+						e1.printStackTrace();
+					} catch (OperationCanceledException e1) {
+						e1.printStackTrace();
+					} catch (MalformedTreeException e1) {
+						e1.printStackTrace();
+					} catch (BadLocationException e1) {
+						e1.printStackTrace();
+					}
+		    		
+		    	}else{
+		    		
+			    	MyClass newClass = this.createEmptyClass(oldClass, i);
+			    	this.moveMethods(this.getMyMethodList(cluster), oldClass, newClass, monitor, i);
+		    	}
+		    }
+	    }
+	    
+	    monitor.done();
+	    
+	}
+	
+	
+	
+	
+	public ArrayList<MyMethod> getMyMethodList(Vector<String> cluster){
+		ArrayList<MyMethod> methods = new ArrayList<MyMethod>();
+		
+		for(String id: cluster){
+			methods.add(ProjectAnalyzer.project.getMethodList().get(id));
+		}
+		
+		return methods;
+	}
+	
+	
+	public MyClass activateExtractClassWithFields(ExtractClassDescriptor.Field[] fields, MyClass oldClass, String FileName) throws OperationCanceledException, CoreException, MalformedTreeException, BadLocationException{
+		ExtractClassDescriptor descriptor = RefactoringSignatureDescriptorFactory.createExtractClassDescriptor();
+		
+	    descriptor.setClassName(FileName);
+	    descriptor.setCreateGetterSetter(false);
+	    descriptor.setProject(ProjectAnalyzer.prjName);
+	    descriptor.setType(oldClass.getCu().getTypeRoot().findPrimaryType());
+	    descriptor.setFields(fields);
+	    descriptor.setFieldName(FileName.toLowerCase());
+		ExtractClassRefactoring refactoring = new ExtractClassRefactoring(descriptor);
+		makeChange(refactoring);
+		
+		ICompilationUnit iUnit = oldClass.getParent().getPf().getCompilationUnit(FileName + ".java");
+		ICompilationUnit workingCopy = iUnit.getWorkingCopy(null);
+		CompilationUnit unit = ExtractionHelper.parse(iUnit);
+		Document document= new Document(iUnit.getSource());
+		
+		AbstractTypeDeclarationVisitor typeVisitor = new AbstractTypeDeclarationVisitor();
+		unit.accept(typeVisitor);
+		ArrayList<TypeDeclaration> classType = typeVisitor.getTypes();
+		TypeDeclaration td = classType.get(0);
+		String fullName = unit.getTypeRoot().findPrimaryType().getFullyQualifiedName();
+		
+		moveImport(oldClass, workingCopy, unit, document);
+
+		MyClass newClass = new MyClass(fullName, td, unit, oldClass.getParent());
+		
+		return newClass;
+//		ExtractClassWizard wizard= new ExtractClassWizard(descriptor, refactoring);
+//	    new RefactoringStarter().activate(wizard, null, 
+//	    		RefactoringMessages.OpenRefactoringWizardAction_refactoring, RefactoringSaveHelper.SAVE_ALL);
+	    
+	}
+
+	private void moveImport(MyClass oldClass, ICompilationUnit workingCopy,
+			CompilationUnit unit, Document document) throws JavaModelException {
+		ASTRewrite rewriter = ASTRewrite.create(unit.getAST()); 
+		ListRewrite lrw = rewriter.getListRewrite(unit, CompilationUnit.IMPORTS_PROPERTY);
+		for(Object id: oldClass.getCu().imports()){
+			ImportDeclaration ipt = (ImportDeclaration) id;
+			lrw.insertLast(ipt, null);
+		}
+		
+		TextEdit edits = rewriter.rewriteAST(document, null);
+		try {
+		    edits.apply(document);
+		    String newSource = document.get();
+
+		    // update of the compilation unit
+		    workingCopy.getBuffer().setContents(newSource);
+		    workingCopy.commitWorkingCopy(false, null);
+		   
+		    workingCopy.discardWorkingCopy();
+		} catch(MalformedTreeException e) {
+			e.printStackTrace();
+		} catch(BadLocationException e) {
+			e.printStackTrace();
+		}
+	}
+
+	private void makeChange(Refactoring refactoring)
+			throws CoreException {
+		IProgressMonitor monitor = new NullProgressMonitor();
+	    refactoring.checkInitialConditions(monitor);
+	    refactoring.checkFinalConditions(monitor);
+		Change change = refactoring.createChange(monitor);
+		change.perform(monitor);
+	}
+	
+	public MyClass createEmptyClass(MyClass oldClass, int idx){
+		String newFileName = ExtractionHelper.getFileName(oldClass, idx);
+		ClassCreateChanger changer = new ClassCreateChanger(oldClass, newFileName, oldClass.getParent().getPf());
+		changer.change();
+        return changer.getNewClass();
+	}
+	
+	
+	public void moveMethods(ArrayList<MyMethod> movingMethods, MyClass source, MyClass target, IProgressMonitor monitor,
+			int cluster){
+		try {
+			ArrayList<MyMethod> notMoved = this.notMoved(movingMethods, source, target);
+			this.move(notMoved, movingMethods, source, target, monitor, cluster);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private ArrayList<MyMethod> notMoved(ArrayList<MyMethod> movingMethods, MyClass source, MyClass target){
+		ArrayList<MyMethod> notMoved = getNotMovedMethod(source.getOwnedMethods(), movingMethods);
+		for(MyMethod m: notMoved){
+			if(m!=null && hasBackCall(m, movingMethods)){
+				new AccessModifierChanger(m).change();
+			}
+		}
+		
+		return notMoved;
+	}
+	
+	private ArrayList<MyMethod> getNotMovedMethod(ArrayList<MyMethod> all, ArrayList<MyMethod> movingMethods){
+		Hashtable<String, String> table = new Hashtable<String, String>();
+		ArrayList<MyMethod> notMoved = new ArrayList<MyMethod>();
+		
+		for(MyMethod m: movingMethods){
+			if(m!=null){
+				table.put(m.getID(), m.getID());
+			}
+		}
+		
+		for(MyMethod m: all){
+			if(m!=null && !table.containsKey(m.getID())){
+				notMoved.add(m);
+			}
+		}
+		
+		return notMoved;
+	}
+	
+	private boolean hasBackCall(MyMethod notMoved, ArrayList<MyMethod> movingMethods){
+		for(MyMethod m: movingMethods){
+			if(m!=null){
+				ArrayList<MyMethod> out = m.getFanOut();
+				for(MyMethod o: out){
+					if(o!=null){
+						if(o.getID().equals(notMoved.getID())){
+							return true;
+						}
+					}
+				}
+			}
+			
+		}
+		return false;
+	}
+
+	private void move(ArrayList<MyMethod> notMoved, ArrayList<MyMethod> movingMethods, MyClass source, MyClass target,
+			IProgressMonitor monitor, int cluster)
+			throws JavaModelException {
+		
+		for(MyMethod m: movingMethods){
+			if(m!=null){
+				monitor.worked(30 * cluster+1);
+				monitor.subTask("Caller methods are being analyed.");
+				IMethod targetMethod = (IMethod)m.getMd().resolveBinding().getJavaElement();
+				Caller caller = new Caller(targetMethod);
+				caller.getCallersOf(movingMethods);
+				changedUnits.addAll(caller.getCallerClassCU());
+				
+				monitor.worked(40 * cluster+1);
+				IType targetType = target.getCu().getTypeRoot().findPrimaryType();
+				changedUnits.add(targetType.getCompilationUnit());
+				changedUnits.add(source.getCu().getTypeRoot().findPrimaryType().getCompilationUnit());
+				
+				monitor.worked(50 * cluster+1);
+				monitor.subTask("Access modifiers are being changed.");
+				AccessModifierChanger accessChanger = new AccessModifierChanger(m);
+				accessChanger.change();
+				IMethod movingIMethod = accessChanger.getIMethod();
+				
+				monitor.worked(60 * cluster+1);
+				monitor.subTask("Methods are being moved to the new class");
+				new MethodMoveChanger(source, target, targetType, movingIMethod, m).change();
+				IMethod movedIMethod = targetType.getMethod(movingIMethod.getElementName(), movingIMethod.getParameterTypes());
+				
+				monitor.worked(70 * cluster+1);
+				monitor.subTask("New Fields are being newly created");
+				FieldChanger fieldChanger = new FieldChanger(targetType, caller.makeCallerClassSet());
+				fieldChanger.change();
+				String identifier = fieldChanger.getFieldIdentifier();
+				
+				monitor.worked(80 * cluster+1);
+				monitor.subTask("Identifiers of caller methods are being changed to the moved methods in the new class");
+				InternalInvocationChanger internalChanger = 
+						new InternalInvocationChanger(notMoved, source, movedIMethod, m, identifier, this.result, cluster);
+				internalChanger.change();
+				
+				boolean addParam = internalChanger.isHasNewParam() || internalChanger.isHasNewParam4FieldAccess();
+				new PointerChanger(movedIMethod, caller.getCallerMethods(), identifier, addParam).change();
+			}
+		}
+
+	    try{
+	    	monitor.worked(90 * cluster+1);
+			monitor.subTask("Import statements in the chaged classes are being organized.");
+			new ImportChanger(changedUnits, targetSite).change();
+		}catch(Exception e){
+			
+		}
+	}
+}

@@ -1,0 +1,87 @@
+package zuna.mining.util;
+
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+
+public class MyFileWriter {
+
+	private BufferedWriter out = null;
+	
+	public void init(String file) {
+		
+		try {
+			
+			if (out == null) { 
+			
+				out = new BufferedWriter(new FileWriter(file));
+			}
+		}
+		catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public void print(String str) {
+		
+		try {
+			
+			if (out != null) { 
+			
+				out.write(str);
+			}
+		}
+		catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public void print(int i) {
+		
+		try {
+			
+			if (out != null) { 
+			
+				out.write(Integer.toString(i));
+			}
+		}
+		catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public void print(Object o) {
+		
+		try {
+			
+			if (out != null) { 
+			
+				out.write(o.toString());
+			}
+		}
+		catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public void close() {
+		
+		if (out != null) {
+			
+			try {
+				
+				out.close();
+				
+				out = null;
+			}
+			catch (IOException e) {
+				
+				e.printStackTrace();
+			}
+		}
+	}
+}

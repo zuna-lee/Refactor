@@ -1,0 +1,225 @@
+package zuna.refactoring.operator.divergentChange;
+
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Vector;
+
+import org.eclipse.core.resources.IProject;
+import org.tmatesoft.svn.core.ISVNLogEntryHandler;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLogEntry;
+import org.tmatesoft.svn.core.SVNLogEntryPath;
+import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
+import org.tmatesoft.svn.core.wc.SVNRevision;
+
+import zuna.metric.cohesion.FCC;
+import zuna.metric.coupling.CBO;
+import zuna.model.MyClass;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.operator.Analyzer;
+
+
+public class DivergentChange extends Analyzer{
+
+	
+	private static Vector<Vector<String>> logs = new Vector<Vector<String>>();
+	
+	private static SVNHistoryTracker tracker;
+	private String prjName;
+	private String url;
+	private String path;
+	private int pathLength;
+	
+
+	public DivergentChange(IProject iproject) {
+		super(iproject);
+		this.prjName=iproject.getName();
+		this.init();
+	}
+	
+	
+	private void init(){
+		if(prjName.startsWith("ArgoUML")) url = "http://argouml.tigris.org/svn/argouml/trunk";
+		else if(prjName.startsWith("JEdit")) url = "svn://svn.code.sf.net/p/jedit/svn";
+		else if(prjName.startsWith("JHotDraw")) url = "svn://svn.code.sf.net/p/jhotdraw/svn";
+		else if(prjName.startsWith("JMeter")) url = "http://svn.apache.org/repos/asf/jmeter/trunk";
+		else if(prjName.startsWith("Refactoring")) url = "https://163.239.200.152/svn/Refactoring/";
+		
+		if(prjName.startsWith("ArgoUML")) {
+			path = "/src.*";
+		}else if(prjName.startsWith("JEdit")) {
+			path = "/jEdit/trunk.*";
+			pathLength = path.length()-1;
+		}else if(prjName.startsWith("JHotDraw")) {
+			path = "/trunk/jhotdraw7/src/main/java.*";
+			pathLength = path.length()-1;
+		}else if(prjName.startsWith("JMeter")) {
+			path = "/src.*";
+		}else if(prjName.startsWith("Refactoring")) {
+			path = "/src.*";
+		}
+	}
+	
+	private boolean connectToSVN() {
+		tracker = new SVNHistoryTracker();
+		DAVRepositoryFactory.setup();
+		String name="";
+		String password ="";
+		name = "zuna";
+		password = "tjrkdSELAB913";
+		
+		return tracker.connectToSVN(url, name, password);
+	}
+
+	private void trackSVN() {
+		String[] paths = { "" };
+		//JEdit: 10000, JHotDraw: 0, JMeter: 1550000
+		long startRevision = 30;
+		long endRevision = SVNRevision.HEAD.getNumber();
+		boolean changedPath = true;
+		boolean strictNode = false;
+		long limit = -1;
+		ISVNLogEntryHandler handler = new ISVNLogEntryHandler() {
+			@Override
+			public void handleLogEntry(SVNLogEntry entry) throws SVNException {
+				
+				Vector<String> javafiles = filterJava(entry.getChangedPaths());
+				if(javafiles.size()>1)
+					logs.add(javafiles);
+			}
+		};
+		tracker.log(paths, startRevision, endRevision, changedPath, strictNode,
+				limit, handler);
+	}
+	
+	
+	private Vector<String> filterJava(Map<String, SVNLogEntryPath> map) {
+		Vector<String> result = new Vector<String>();
+		
+		Iterator<String> iterator = map.keySet().iterator();
+		while (iterator.hasNext()) {
+			String key = iterator.next();
+			SVNLogEntryPath value = map.get(key);
+			
+			if (value.getPath().matches(".*\\.java") && value.getType()=='M') {
+				String fileName = "";
+				if(prjName.equals("ArgoUML") || prjName.startsWith("Refactoring")){
+					fileName = this.getIDArgoUML(value.getPath());
+				}else if (prjName.startsWith("PicketLink")){
+					fileName = this.getIDPicketLink(value.getPath());
+				}else{
+					fileName = this.getID(value.getPath());
+				}
+				
+				if(ProjectAnalyzer.project.getClassesInSystem().containsKey(fileName)) 
+					result.add(fileName);
+			}
+		}
+		
+		return result;
+	
+	}
+
+
+	public void analyze() {
+		boolean result = this.connectToSVN();
+		if(result){
+			System.out.println("Track Start");
+			this.trackSVN();
+			System.out.println(logs.size());
+			FCC fcc = new FCC(ProjectAnalyzer.project);
+			CBO cbo = new CBO(ProjectAnalyzer.project);
+			
+			for(String key: ProjectAnalyzer.project.getClassesInSystem().keySet()){
+				Vector<Integer> changedRevisions = this.makeCoChangedTable(key);
+				MyClass c = ProjectAnalyzer.project.getClass(key);
+				double dc = this.getDC(changedRevisions);
+				double fccValue = fcc.getMetric(c);
+				double changeRate = (double)changedRevisions.size()/(double)logs.size();
+				if(!(c.isLibrary() || c.isAbstract()||c.isInterface()||c.isEnumuration() || dc==0 || fccValue==0|| c.getOwnedMethods().size()<=1))
+					System.out.println(key + ":" + changeRate +":"+ dc + ":" + fccValue + ":" + cbo.getMetric(c));
+			}
+			
+		}else{
+			System.out.println("Connection Fail to the SVN of the application");
+		}
+		System.out.println("table end");
+	}
+	
+	private double getDC(Vector<Integer> changedRevision){
+		Hashtable<String, String> intersection = new Hashtable<String, String>();
+		Hashtable<String, String> union = new Hashtable<String, String>();
+		for(int revision: changedRevision){
+			Vector<String> changedFiles = logs.get(revision);
+			for(String file: changedFiles){
+				intersection.put(file, file);
+				union.put(file, file);
+			}
+		}
+		
+		Vector<String> remove = new Vector<String>();
+		
+		for(String file: intersection.keySet()){
+			for(int revision: changedRevision){
+				Vector<String> changedFiles = logs.get(revision);
+				if(!changedFiles.contains(file)) remove.add(file);
+			}
+		}
+		
+		for(String removeFile: remove){
+			intersection.remove(removeFile);
+		}
+		
+		if(union.size()>0){
+			return ((double)intersection.size()/(double)union.size());
+		}
+		else return 0;
+		
+	}
+	
+	private Vector<Integer> makeCoChangedTable(String classID){
+		Vector<Integer> changedRevision = new Vector<Integer>();
+		
+		for(int i = 0 ; i < logs.size() ; i++){
+			Vector<String> log = logs.get(i);
+			for(String c: log){
+				if(c.equals(classID)){
+					changedRevision.add(i);
+					break;
+				}
+			}
+		}
+		
+		return changedRevision;
+	}
+	
+
+	private String getID(String fileName){
+		
+		String fileID=fileName;
+		fileID = fileID.substring(pathLength, fileID.length()-5);
+		
+//		fileID = fileID.replace("/", ".");
+		System.out.println(fileName +":" +fileID);
+		return fileID;
+	}
+	
+	
+	private String getIDArgoUML(String fileName){
+		String fileID=fileName;
+		String[] token = fileName.split("/src/");
+		
+		fileID = token[token.length-1].substring(0, token[token.length-1].length()-5).replace("/", ".");
+		return fileID;
+	}
+
+	private String getIDPicketLink(String fileName){
+		String fileID=fileName;
+		String[] token = fileName.split("/src/main/java/");
+		
+		fileID = token[token.length-1].substring(0, token[token.length-1].length()-5).replace("/", ".");
+		return fileID;
+	}
+	
+}

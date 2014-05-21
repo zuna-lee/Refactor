@@ -1,0 +1,287 @@
+package zuna.refactoring.experiment.divergentChange;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Vector;
+
+import org.eclipse.core.resources.IProject;
+import org.tmatesoft.svn.core.ISVNLogEntryHandler;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNLogEntry;
+import org.tmatesoft.svn.core.SVNLogEntryPath;
+import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
+import org.tmatesoft.svn.core.wc.SVNRevision;
+
+import zuna.metric.cohesion.CC;
+import zuna.metric.cohesion.C3;
+import zuna.metric.cohesion.DCD;
+import zuna.metric.cohesion.DCI;
+import zuna.metric.cohesion.FCCAll;
+import zuna.metric.cohesion.LCC;
+import zuna.metric.cohesion.LCOM1;
+import zuna.metric.cohesion.LCOM2;
+import zuna.metric.cohesion.LCOM3;
+import zuna.metric.cohesion.LCOM4;
+import zuna.metric.cohesion.TCC;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.experiment.Analyzer;
+import zuna.util.Logger2File;
+
+
+public class FindBug extends Analyzer{
+
+	private FCCAll fcc = new FCCAll(ProjectAnalyzer.project);
+	private TCC tcc = new TCC(ProjectAnalyzer.project);
+	private LCC lcc = new LCC(ProjectAnalyzer.project);
+	private CC cc = new CC(ProjectAnalyzer.project);
+	private DCD dcd = new DCD(ProjectAnalyzer.project);
+	private DCI dci = new DCI(ProjectAnalyzer.project);
+	private LCOM1 lcom1 = new LCOM1(ProjectAnalyzer.project);
+	private LCOM2 lcom2 = new LCOM2(ProjectAnalyzer.project);
+	private LCOM3 lcom3 = new LCOM3(ProjectAnalyzer.project);
+	private LCOM4 lcom4 = new LCOM4(ProjectAnalyzer.project);
+	private C3 csm = new C3(ProjectAnalyzer.project);
+
+	int buggy = 0;
+	
+	public FindBug(IProject iproject) {
+		super(iproject);
+		this.prjName=iproject.getName();
+		this.init();
+	}
+	
+	private FindBug(){
+		this.prjName="PicketLink";
+		this.init();
+	}
+	private static Vector<Vector<String>> logs = new Vector<Vector<String>>();
+	private static Hashtable<String, Double> buggyFiles = new Hashtable<String, Double>();
+	
+	private static SVNHistoryTracker tracker;
+	private String prjName;
+	private String url;
+	private String path;
+	private int pathLength;
+	
+	private void init(){
+		if(prjName.startsWith("ArgoUML")) url = "http://argouml.tigris.org/svn/argouml/trunk";
+		else if(prjName.startsWith("JEdit")) url = "svn://svn.code.sf.net/p/jedit/svn";
+		else if(prjName.startsWith("JHotDraw")) url = "svn://svn.code.sf.net/p/jhotdraw/svn";
+		else if(prjName.startsWith("JMeter")) url = "http://svn.apache.org/repos/asf/jmeter/trunk/";
+		else if(prjName.startsWith("Log4J")) url = "http://svn.apache.org/repos/asf/logging/log4j/log4j2/trunk/";
+		else if(prjName.startsWith("PicketLink")) url = "http://anonsvn.jboss.org/repos/picketlink/";
+		
+		if(prjName.startsWith("ArgoUML")) {
+			path = "/trunk/src.*";
+		}else if(prjName.startsWith("JEdit")) {
+			path = "/jEdit/trunk.*";
+			pathLength = path.length()-1;
+		}else if(prjName.startsWith("JHotDraw")) {
+			path = "/trunk/jhotdraw7/src/main/java.*";
+			pathLength = path.length()-1;
+		}else if(prjName.startsWith("Log4J")) {
+			path = "/logging/log4j/branches/BRANCH_2_0_EXPERIMENTAL/rgoers/log4j2-core/src/main/java.*";
+		}else if(prjName.startsWith("PicketLink")) {
+			path = "/federation/trunk/picketlink-fed-core/src/main/java/";
+		}
+	}
+	private boolean connectToSVN() {
+		tracker = new SVNHistoryTracker();
+		DAVRepositoryFactory.setup();
+		String name="";
+		String password ="";
+		name = "guest";
+		password = "dkagh";
+		
+		return tracker.connectToSVN(url, name, password);
+	}
+
+	private void trackSVN() {
+		String[] paths = { "" };
+		//JEdit: 20000, JHotDraw: 600, JMeter: 1550000, ArgoUML: 15000, Log4J: 1550000
+		long startRevision = 300;
+		long endRevision = SVNRevision.HEAD.getNumber();
+		boolean changedPath = true;
+		boolean strictNode = false;
+		long limit = -1;
+		ISVNLogEntryHandler handler = new ISVNLogEntryHandler() {
+			@Override
+			public void handleLogEntry(SVNLogEntry entry) throws SVNException {
+				String comment = entry.getMessage();
+				if(comment!=null && (comment.toLowerCase().contains("fixes") || 
+						comment.toLowerCase().contains("patch") || comment.contains("bug"))){ 
+					Vector<String> javafiles = filterJava(entry.getChangedPaths());
+					if(javafiles.size()>0)
+						logs.add(javafiles);
+				}
+			}
+		};
+		tracker.log(paths, startRevision, endRevision, changedPath, strictNode,
+				limit, handler);
+	}
+	
+	
+	private Vector<String> filterJava(Map<String, SVNLogEntryPath> map) {
+		Vector<String> result = new Vector<String>();
+
+		Iterator<String> iterator = map.keySet().iterator();
+		while (iterator.hasNext()) {
+			String key = iterator.next();
+			SVNLogEntryPath value = map.get(key);
+//			if (value.getPath().matches(path)) {
+				if (value.getPath().matches(".*\\.java")) {
+					String buggyFile = "";
+					if(prjName.equals("ArgoUML")){
+						buggyFile = this.getIDArgoUML(value.getPath());
+						buggyFile = this.getIDArgoUML(value.getPath());
+					}else if (prjName.startsWith("PicketLink")){
+						buggyFile = this.getIDPicketLink(value.getPath());
+						buggyFile = this.getIDPicketLink(value.getPath());
+					}
+					else{
+						buggyFile = this.getID(value.getPath());
+						buggyFile = this.getID(value.getPath());
+					}
+					
+					result.add(buggyFile);
+					
+					makeBuggyFileTable(buggyFile, buggyFile);
+				}
+//			}
+		}
+		
+		return result;
+	}
+
+	private void makeBuggyFileTable(String key, String buggyFile) {
+		if(buggyFiles.containsKey(buggyFile)){
+			double v = buggyFiles.get(buggyFile);
+			buggyFiles.put(buggyFile, v+1.0);
+		}else{
+			buggyFiles.put(key, 1.0);
+		}
+	}
+
+
+	public void analyze() {
+		boolean result = this.connectToSVN();
+		if(result){
+			System.out.println("Tracking Start");
+			this.trackSVN();
+			System.out.println("Tracking End");
+			this.printBuggyFiles();
+			this.printCleanFiles();
+		}
+		System.out.println(buggy);
+		
+	}
+	
+	private void viewFaultyfiles(){
+		Hashtable<String, Integer> table = new Hashtable<String, Integer>();
+		
+		for(Vector<String>ss: logs){
+			for(String key: ss){
+				if(table.containsKey(key)){
+					int c = table.get(key) + 1;
+					table.put(key, c);
+				}else{
+					table.put(key, 1);
+				}
+			}
+		}
+		
+		for(String key: table.keySet()){
+			System.out.println(key + ":" + table.get(key));
+		}
+	}
+	
+	
+	private void printCleanFiles(){
+		ArrayList<String> loogg = new ArrayList<String>();
+		for(String key: ProjectAnalyzer.project.getClassList().keySet()){
+			if(ProjectAnalyzer.project.getClassList().containsKey(key) &&
+					!buggyFiles.containsKey(key)
+					&& ProjectAnalyzer.project.getClass(key).getOutterClassUri().equals("java.lang.Object")
+					&& !ProjectAnalyzer.project.getClass(key).isEnumuration()
+					&& !ProjectAnalyzer.project.getClass(key).isInterface()){
+				
+				String l = key + ":" + ProjectAnalyzer.project.getClass(key).getOutterClassUri() +
+						":" + ProjectAnalyzer.project.getClass(key).getOwnedMethods().size() + 
+						":" + ProjectAnalyzer.project.getClass(key).getOwendField().size() +
+						":" + fcc.getMetric(ProjectAnalyzer.project.getClass(key))+
+						":" + tcc.getMetric(ProjectAnalyzer.project.getClass(key)) +
+						":" + lcc.getMetric(ProjectAnalyzer.project.getClass(key)) +
+						":" + dcd.getMetric(ProjectAnalyzer.project.getClass(key)) +
+						":" + dci.getMetric(ProjectAnalyzer.project.getClass(key)) +
+						":" + cc.getMetric(ProjectAnalyzer.project.getClass(key))+
+						":" + csm.getMetric(ProjectAnalyzer.project.getClass(key));
+						
+				loogg.add(l);
+				
+			}
+		}
+		
+		Logger2File.print2CSVFile(loogg, "clean");
+	}
+	
+	private void printBuggyFiles(){
+		
+		ArrayList<String> loogg = new ArrayList<String>();
+		
+		for(String key: buggyFiles.keySet()){
+			if(ProjectAnalyzer.project.getClassList().containsKey(key)
+					&& !ProjectAnalyzer.project.getClass(key).isEnumuration()
+					&& !ProjectAnalyzer.project.getClass(key).isInterface()){
+				String l = key + ":" + buggyFiles.get(key) + ":" + ProjectAnalyzer.project.getClass(key).getOutterClassUri() +
+						":" + ProjectAnalyzer.project.getClass(key).getOwnedMethods().size() + 
+						":" + ProjectAnalyzer.project.getClass(key).getOwendField().size() +
+						":" + fcc.getMetric(ProjectAnalyzer.project.getClass(key))+
+						":" + tcc.getMetric(ProjectAnalyzer.project.getClass(key)) +
+						":" + lcc.getMetric(ProjectAnalyzer.project.getClass(key)) +
+						":" + dcd.getMetric(ProjectAnalyzer.project.getClass(key)) +
+						":" + dci.getMetric(ProjectAnalyzer.project.getClass(key)) +
+						":" + cc.getMetric(ProjectAnalyzer.project.getClass(key)) +
+						":" + csm.getMetric(ProjectAnalyzer.project.getClass(key));
+				loogg.add(l);
+			}
+		}
+		
+		Logger2File.print2CSVFile(loogg, "buggy");
+	}
+	
+	private String getID(String fileName){
+		String fileID=fileName;
+		fileID = fileID.substring(pathLength, fileID.length()-5);
+		
+		fileID = fileID.replace("/", ".");
+		System.out.println(fileID);
+		return fileID;
+	}
+	
+	private String getIDArgoUML(String fileName){
+		String fileID=fileName;
+		String[] token = fileName.split("/src/");
+		
+		fileID = token[token.length-1].substring(0, token[token.length-1].length()-5).replace("/", ".");
+		System.out.println(fileID);
+		return fileID;
+	}
+
+	private String getIDPicketLink(String fileName){
+		String fileID=fileName;
+		String[] token = fileName.split("/src/main/java/");
+		
+		fileID = token[token.length-1].substring(0, token[token.length-1].length()-5).replace("/", ".");
+		System.out.println(fileID);
+		return fileID;
+	}
+	
+//	public static void main(String[] args){
+//		FindBug dc = new FindBug();
+//		dc.connectToSVN();
+//		dc.trackSVN();
+////		dc.printBuggyFiles();
+//	}
+}

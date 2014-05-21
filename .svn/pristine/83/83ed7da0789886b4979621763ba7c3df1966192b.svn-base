@@ -1,0 +1,75 @@
+package zuna.mining.gap;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import zuna.mining.ParameterPair;
+import zuna.model.MyParameter;
+
+public class MyCluster {
+
+	private List<ParameterPair> parameterPairs;
+
+	private double quality = 0.0;
+
+	public double calculateQuality(Map<ParameterPair, Double> probabilityMap) {
+		
+		double sum = 0.0;
+		
+		for (ParameterPair parameterPair : parameterPairs) {
+			
+			double a = probabilityMap.get(parameterPair);
+			
+			double b = probabilityMap.get(parameterPair.swap());
+			
+			double probability = Math.max(a, b);
+			
+			sum += probability;
+		}
+		
+		quality = sum;
+		
+		return quality;
+	}
+	
+	public double getQuality() {
+		return quality;
+	}
+
+	public void setQuality(double quality) {
+		this.quality = quality;
+	}
+	
+	public List<ParameterPair> getParameterPairs() {
+		return parameterPairs;
+	}
+
+	public void setParameterPairs(List<ParameterPair> parameterPairs) {
+		
+		this.parameterPairs = parameterPairs;
+	}
+	
+	public List<MyParameter> getParameters() {
+		
+		List<MyParameter> parameters = new ArrayList<MyParameter>();
+		
+		for (ParameterPair parameterPair : parameterPairs) {
+			
+			MyParameter first = parameterPair.getFirst();
+			MyParameter second = parameterPair.getSecond();
+			
+			if (!parameters.contains(first)) {
+				
+				parameters.add(first);
+			}
+			
+			if (!parameters.contains(second)) {
+				
+				parameters.add(second);
+			}
+		}
+		
+		return parameters;
+	}
+}

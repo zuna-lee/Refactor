@@ -1,0 +1,23 @@
+package zuna.mining.hac.worldpeace;
+import zuna.mining.hac.experiment.Experiment;
+
+
+public class MyExperiment implements Experiment {
+
+	private double[][] matrix;
+	
+	public MyExperiment(double[][] matrix) {
+		super();
+		this.matrix = matrix;
+	}
+
+	public int getNumberOfObservations() {
+		// TODO Auto-generated method stub
+		return matrix[0].length;
+	}
+	
+	public double getSimilarity(int arg0, int arg1) {
+		
+		return matrix[arg0][arg1];
+	}
+}

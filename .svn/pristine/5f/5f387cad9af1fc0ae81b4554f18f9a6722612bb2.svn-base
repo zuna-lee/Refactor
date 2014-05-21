@@ -1,0 +1,200 @@
+package zuna.refactoring.operator.code.modifiers;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.List;
+
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.ImportDeclaration;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.Modifier.ModifierKeyword;
+import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
+
+import zuna.model.MyClass;
+import zuna.model.MyField;
+import zuna.model.MyMethod;
+
+public class CreateClass extends CodeModifier{
+
+	private static boolean isFieldAccess;
+	public static Hashtable<String, MethodDeclaration> updated = new Hashtable<String, MethodDeclaration>();
+	
+	public void create(String name, IPackageFragment ipackage, ArrayList<MyMethod> notExtracted, 
+			ArrayList<MyMethod> extracted, Hashtable<String, MyField> notShareAttribute, List<ImportDeclaration> importList){
+		
+		try {
+			String cont = "";
+			cont = getHeader(name, ipackage, importList, cont);
+			
+			for(String key: notShareAttribute.keySet()){
+				MyField f = notShareAttribute.get(key);
+				FieldDeclaration fd = f.getFd();
+				cont += fd.toString();
+			}
+			
+			for(MyMethod m: extracted){
+				
+				MethodDeclaration md = m.getMd();
+				
+				if(this.isInvokedByNotExtracted(notExtracted, extracted, m)){
+					Iterator iter = md.modifiers().iterator();
+					
+					while(iter.hasNext()){
+						Object obj = iter.next();
+						
+						if(obj instanceof Modifier){
+							Modifier mod = (Modifier)obj;
+							
+							if(mod.isPrivate() || mod.isProtected()){
+								md.modifiers().remove(obj);
+								md.modifiers().add(md.getAST().newModifier(ModifierKeyword.PUBLIC_KEYWORD));
+							}
+							
+						}
+					}
+				}
+				
+				cont += "\n\n"+md.toString();
+			}
+			
+			cont = getFooter(cont);
+			
+			save(name, ipackage, cont);
+		    
+		} catch (JavaModelException e) {
+
+		}
+	}
+	public void createEmptyClass(String name, IPackageFragment ipackage){
+		
+		try {
+			String cont = "";
+			cont = getHeader(name, ipackage, cont);
+			cont = getFooter(cont);
+			save(name, ipackage, cont);
+		    
+		} catch (JavaModelException e) {
+
+		}
+	}
+	private boolean isInvokedByNotExtracted(ArrayList<MyMethod> notExtracted, 
+			ArrayList<MyMethod> extractedMethods, MyMethod extracted){
+		
+		
+		ArrayList<MyMethod> fanin = extracted.getFanIn();
+		
+		for(MyMethod in: fanin)
+		{
+			String faninid = in.getID();
+			for(MyMethod not: notExtracted)
+			{
+				if(not.getID().equals(faninid) && !super.isExtracted(extractedMethods, not))
+				{
+					return true;
+				}
+			}
+		}
+		
+		return false;
+		
+	}
+	
+	public void createWithNewMethods(String name, MyClass oldClass, 
+			IPackageFragment ipackage, ArrayList<MyField> fields, 
+			ArrayList<MyMethod> notExtracted, ArrayList<MyMethod> extractedMethods, Hashtable<String, MyField> notShareAttribute
+			, List<ImportDeclaration> importList, boolean shareAttribute, 
+			String paramName){
+		
+		
+		
+		updated.clear();
+		try {
+			String cont = "";
+			cont = getHeader(name, ipackage, importList, cont);
+			
+			for(String key: notShareAttribute.keySet()){
+				MyField f = notShareAttribute.get(key);
+				FieldDeclaration fd = f.getFd();
+				cont += fd.toString();
+			}
+			
+			for(MyMethod m: extractedMethods){
+				MethodDeclaration md = this.getMD(m);
+				
+				isFieldAccess = false;
+				
+				if(super.containReferencesToOldClass(md, oldClass.getOwnedMethods(), extractedMethods, fields, notShareAttribute, oldClass))
+				{
+					SingleVariableDeclaration variableDeclaration = md.getAST().newSingleVariableDeclaration();
+					variableDeclaration.setType(md.getAST().newSimpleType(md.getAST().newName(getTypeName(oldClass))));
+					variableDeclaration.setName(md.getAST().newSimpleName(paramName));
+					md.parameters().add(variableDeclaration);
+					updated.put(md.getName().toString(), md);
+				}
+				
+				if(this.isInvokedByNotExtracted(notExtracted, extractedMethods, m))
+				{
+					Iterator iter = md.modifiers().iterator();
+					while(iter.hasNext()){
+						Object obj = iter.next();
+						if(obj instanceof Modifier){
+							Modifier mod = (Modifier)obj;
+							
+							if(mod.isPrivate() || mod.isProtected()){
+								md.modifiers().remove(obj);
+								md.modifiers().add(md.getAST().newModifier(ModifierKeyword.PUBLIC_KEYWORD));
+							}
+							
+						}
+					}
+				}
+				
+				cont += "\n\n"+md.toString();
+			}
+			
+			cont = getFooter(cont);
+			
+			save(name, ipackage, cont);
+		    
+		} catch (JavaModelException e) {
+
+		}
+	}
+
+	
+
+	private String getFooter(String cont) {
+		cont+="}";
+		return cont;
+	}
+
+	private String getHeader(String name, IPackageFragment ipackage, String cont) {
+		if(!ipackage.getElementName().trim().equals("")){
+			cont +="package "+ ipackage.getElementName() +";\n\n";
+		}
+		
+		
+		cont +="\n public class " + name.split("\\.")[0] + "{ \n\n";
+		return cont;
+	}
+	
+	private String getHeader(String name, IPackageFragment ipackage,
+			List<ImportDeclaration> importList, String cont) {
+		if(!ipackage.getElementName().trim().equals("")){
+			cont +="package "+ ipackage.getElementName() +";\n\n";
+		}
+		
+		for(ImportDeclaration i: importList){
+			cont +=i.toString();
+		}
+		
+		cont +="\n public class " + name.split("\\.")[0] + "{ \n\n";
+		return cont;
+	}
+}
+
+

@@ -1,0 +1,113 @@
+package zuna.refactoring.ui.views;
+
+import java.util.Vector;
+
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Table;
+import org.eclipse.swt.widgets.TableColumn;
+import org.eclipse.swt.widgets.TableItem;
+import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.part.ViewPart;
+
+public class DecomposedResultView extends ViewPart{
+	public static Vector<Vector<String>> result = new Vector<Vector<String>>();
+	
+	@Override
+	public void createPartControl(Composite parent) {
+		// TODO Auto-generated method stub
+		if(result.size()<1){
+			PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().hideView(this);
+		}
+		
+		Composite left = configureLayout(parent);
+		this.createTable(left);
+		
+	}
+
+	private void createTable(Composite parent){
+		
+		
+		final Table table = new Table(parent, SWT.SINGLE | SWT.BORDER | SWT.FULL_SELECTION);
+        table.setLinesVisible(true);
+        table.setHeaderVisible(true);
+
+		GridData tableData = new GridData(SWT.FILL, SWT.FILL, true, true);
+		tableData.horizontalSpan=2;
+		tableData.heightHint = 100;
+        table.setLayoutData(tableData);
+
+		TableColumn column0 = new TableColumn(table, SWT.NONE);
+		column0.setText("Method");
+		column0.setWidth(500);
+		          
+		
+
+		TableColumn column2 = new TableColumn(table, SWT.NONE);
+		column2.setText("Group");
+		column2.setWidth(100);
+		
+		for(int clusterIDX = 0 ; clusterIDX < result.size() ; clusterIDX++){
+			Vector<String> cluster = result.get(clusterIDX);
+			for(int method = 0 ; method < cluster.size() ; method++){
+				TableItem item = new TableItem(table, SWT.NONE);
+				item.setText(0, cluster.get(method));
+				item.setText(1, "GROUP " + clusterIDX);
+			}
+		}
+	}
+	
+
+	private void createButton(Composite parent) {
+		GridData data = new GridData(SWT.FILL, SWT.FILL, true, true);
+		data.heightHint = 30;
+		Button b1 = new Button(parent, SWT.None);
+		b1.setText("Refactoring");
+		b1.setLayoutData(data);
+		
+		b1.addSelectionListener(new SelectionAdapter() {
+		    @Override
+		    public void widgetSelected(SelectionEvent e) {
+		    	
+		    }
+
+		});
+		
+		
+		Button b3 = new Button(parent, SWT.None);
+		b3.setText("Show Detailed Metric");
+		b3.setLayoutData(data);
+		
+		b3.addSelectionListener(new SelectionAdapter() {
+		    @Override
+		    public void widgetSelected(SelectionEvent e) {
+		        // Handle the selection event
+		    }
+		});
+	}
+	
+	private Composite configureLayout(Composite parent) {
+		parent.setLayout(new GridLayout(1, false));
+
+	    SashForm form = new SashForm(parent, SWT.HORIZONTAL);
+	    form.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+
+	    Composite left = new Composite(form, SWT.BORDER);
+	    left.setLayout(new GridLayout(2, true));
+	    left.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+		return left;
+	}
+		
+	@Override
+	public void setFocus() {
+		// TODO Auto-generated method stub
+		
+	}
+
+}

@@ -1,0 +1,4 @@
+2013-11-26 00:24:09,162 DEBUG [main] (Configuration.java:219) - Custom properties not found: C:\Users\Jun\workspace\Refactoring\lib\tml.properties
+2013-11-26 00:24:09,353 ERROR [main] (DbConnection.java:96) - Problems accessing the annotations database. Please check for the database and the user defined in the tml.properties file. Read the README.txt file for installation instructions.
+2013-11-26 00:24:09,356 ERROR [main] (DbConnection.java:99) - User: tml URL:jdbc:mysql://localhost/tml
+2013-11-26 00:24:09,356 ERROR [main] (DbConnection.java:100) - Access denied for user 'tml'@'localhost' (using password: YES)

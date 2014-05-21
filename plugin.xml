@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+   <extension
+         point="org.eclipse.ui.actionSets">
+      <actionSet
+            label="Show Metric"
+            visible="true"
+            id="Refactoring.actionSet">
+         <menu
+               label="AutoRefactoring"
+               id="AutoRefactoring">
+            <separator
+                  name="AutoRefactoring">
+            </separator>
+         </menu>
+         <action
+               class="zuna.refactoring.ui.actions.ClassDecomposer"
+               icon="icons/sample.gif"
+               id="Refactoring.action1"
+               label="&amp;ClassDecomposer"
+               menubarPath="AutoRefactoring/ClassDecomposer"
+               style="push"
+               toolbarPath="ClassDecomposer"
+               tooltip="ClassDecomposer">
+         </action>
+      </actionSet>
+   </extension>
+   
+   
+
+</plugin>

@@ -1,0 +1,156 @@
+package zuna.refactoring.operator.code.modifiers;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.ArrayAccess;
+import org.eclipse.jdt.core.dom.Block;
+import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.InfixExpression;
+import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.NumberLiteral;
+import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.ThisExpression;
+
+import zuna.model.MyMethod;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.ui.operator.OperatorUtils;
+
+public class CallerModifier extends CodeModifier{
+
+	public  void modify(ArrayList<MyMethod> extracted, ArrayList<MyMethod> callers, String newClassName){
+		
+		for(MyMethod caller: callers){
+			init(caller);
+			OperatorUtils.openFile(caller.getParent(), ProjectAnalyzer.iproject);
+			if(!isExtracted(extracted, caller)) {
+				replaceInvocation(extracted, newClassName);
+			}
+			save();
+		}
+	}
+	
+	private  void replaceInvocation(final ArrayList<MyMethod> extracted, String newClassName) {
+		Block block = this.md.getBody();
+		final ArrayList<MethodInvocation> invs = getInvocationToExtractedMethod(extracted, block);
+		for(int i = 0 ; i < invs.size() ; i++){
+			MethodInvocation methodInvocation = this.md.getAST().newMethodInvocation();
+			SimpleName name = this.md.getAST().newSimpleName(newClassName.toLowerCase() + "_att");
+			this.setArgments(invs, i, methodInvocation);
+			
+			if(Modifier.isStatic(invs.get(i).resolveMethodBinding().getModifiers())){
+				methodInvocation.setExpression(this.md.getAST().newSimpleName(newClassName));
+			}else{
+				methodInvocation.setExpression(name);
+			}
+			methodInvocation.setName(this.md.getAST().newSimpleName(invs.get(i).getName().toString()));
+			rewriter.replace(invs.get(i), methodInvocation, null);
+		}
+	}
+
+	private void setArgments(final ArrayList<MethodInvocation> invs, int i,
+			MethodInvocation methodInvocation) {
+		
+		Iterator<Expression> iter = invs.get(i).arguments().iterator();
+		while(iter.hasNext()){
+			Object obj = iter.next();
+			if(obj instanceof SimpleName){
+				SimpleName argName = astTarget.newSimpleName(((SimpleName) obj).getIdentifier());
+				methodInvocation.arguments().add(argName);
+			}else if(obj instanceof ThisExpression){
+				methodInvocation.arguments().add(astTarget.newThisExpression());
+			}else if(obj instanceof NumberLiteral){
+				NumberLiteral old = (NumberLiteral) obj;
+				NumberLiteral newNo = astTarget.newNumberLiteral();
+				methodInvocation.arguments().add(ASTNode.copySubtree(newNo.getAST(), old));
+			}else if(obj instanceof InfixExpression){
+				InfixExpression old = (InfixExpression) obj;
+				InfixExpression newInfx = astTarget.newInfixExpression();
+				methodInvocation.arguments().add(ASTNode.copySubtree(newInfx.getAST(), old));
+			}else if(obj instanceof ArrayAccess){
+				ArrayAccess old = (ArrayAccess) obj;
+				ArrayAccess newAry = astTarget.newArrayAccess();
+				methodInvocation.arguments().add(ASTNode.copySubtree(newAry.getAST(), old));
+			}else if(obj instanceof MethodInvocation){
+				MethodInvocation old = (MethodInvocation) obj;
+				MethodInvocation newIV = astTarget.newMethodInvocation();
+				methodInvocation.arguments().add(ASTNode.copySubtree(newIV.getAST(), old));
+			}
+			
+		}
+		
+		if(hasFieldAccess(invs.get(i))){
+			Expression exp = invs.get(i).getExpression();
+			if(exp==null){
+				methodInvocation.arguments().add(astTarget.newThisExpression());
+			}else{
+				String argName = invs.get(i).getExpression().toString();
+				methodInvocation.arguments().add(astTarget.newSimpleName(argName));
+			}
+			
+		}
+	}
+	
+	private ArrayList<MethodInvocation> getInvocationToExtractedMethod(
+			final ArrayList<MyMethod> extracted, Block block) {
+		
+		final ArrayList<MethodInvocation> invs = new ArrayList<MethodInvocation>();	
+		block.accept(new ASTVisitor(){
+			@Override
+			public boolean visit(MethodInvocation inv){
+				if(isExtracted(inv))
+					invs.add(inv);
+				return true;
+			}
+			
+			private boolean isExtracted(MethodInvocation inv){
+				boolean flg = false;
+				String invName = this.getFullName(inv);
+
+				for(MyMethod m: extracted){
+					String[] split = m.getID().split("\\.");
+					String methodName = split[split.length-1];
+					if(methodName.equals(invName)){
+						flg = true;
+						break;
+					}
+				}
+				return flg;
+			}
+			
+			private String getFullName(MethodInvocation inv){
+				String name = inv.getName().getIdentifier();
+				name += "(";
+				Iterator iter = inv.arguments().iterator();
+				
+				int cnt = 0;
+				while(iter.hasNext()){
+					Object obj = iter.next();
+					Expression ex = ((Expression) obj);
+					String typeName = ex.resolveTypeBinding().getName();
+					name += typeName + " ";
+				}
+				
+				name += ")";
+				
+				return name;
+			}
+			
+		});
+		return invs;
+	}
+
+	
+	
+	private boolean hasFieldAccess(MethodInvocation methodInvocation) {
+		return CreateClass.updated.containsKey(methodInvocation.getName().toString());
+	}
+
+	 
+	
+	
+	
+}

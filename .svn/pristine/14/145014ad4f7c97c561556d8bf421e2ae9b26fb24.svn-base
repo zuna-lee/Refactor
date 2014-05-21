@@ -1,0 +1,83 @@
+package zuna.refactoring.codeChanger;
+
+import java.util.HashSet;
+
+import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IMember;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.internal.corext.callhierarchy.CallHierarchy;
+import org.eclipse.jdt.internal.corext.callhierarchy.MethodWrapper;
+
+@SuppressWarnings("restriction")
+public class Caller {
+	private HashSet<IMethod> callerMethods = new HashSet<IMethod>();
+	private HashSet<IType> callerClasses = new HashSet<IType>();
+	private IMethod callee;
+	public HashSet<IMethod> getCallerMethods() {
+		return callerMethods;
+	}
+	
+	public HashSet<IType> getCallerClasses() {
+		return callerClasses;
+	}
+
+	public Caller(IMethod callee){
+		this.callee = callee;
+	}
+
+	public HashSet<IType> makeCallerClassSet() {
+		for(IMethod m: callerMethods){
+			IType type = m.getDeclaringType();
+			if(!callerClasses.contains(type)){
+				callerClasses.add(type);
+			}
+		}
+		
+		return this.callerClasses;
+	}
+	
+	public void getCallersOf() {
+		try{
+		 CallHierarchy callHierarchy = CallHierarchy.getDefault();
+		 IMember[] members = {this.callee};
+		 MethodWrapper[] methodWrappers = callHierarchy.getCallerRoots(members);
+		  
+		  for (MethodWrapper mw : methodWrappers) {
+		    MethodWrapper[] mw2 = mw.getCalls(new NullProgressMonitor());
+		    HashSet<IMethod> temp = getIMethods(mw2);
+		    callerMethods.addAll(temp);    
+		   }
+		}catch(java.lang.NullPointerException e){
+			e.printStackTrace();
+		}
+	}
+		 
+	private HashSet<IMethod> getIMethods(MethodWrapper[] methodWrappers) {
+		HashSet<IMethod> c = new HashSet<IMethod>(); 
+		for (MethodWrapper m : methodWrappers) {
+			IMethod im = getIMethodFromMethodWrapper(m);
+			if (im != null) {
+				c.add(im);
+			}
+		}
+		return c;
+	}
+		 
+	private IMethod getIMethodFromMethodWrapper(MethodWrapper m) {
+		
+		try {
+			
+			IMember im = m.getMember();
+			if (im.getElementType() == IJavaElement.METHOD) {
+				return (IMethod)m.getMember();
+			}
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		  
+		return null;
+	}
+}

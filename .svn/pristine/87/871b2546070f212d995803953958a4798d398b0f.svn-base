@@ -1,0 +1,183 @@
+package zuna.refactoring.codeChanger;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+
+import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.Signature;
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
+import org.eclipse.jdt.core.dom.VariableDeclaration;
+import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
+
+public class PointerChanger extends ChangeRewrite {
+	private HashSet<IMethod> callerMethods;
+	private String fieldIdentifier;
+	private ArrayList<MethodInvocation> invocation = new ArrayList<MethodInvocation>();
+	
+	public PointerChanger(HashSet<IMethod> callerMethods, String fieldIdentifier){
+		this.callerMethods = callerMethods;
+		this.fieldIdentifier = fieldIdentifier;
+	}
+	
+	@Override
+	protected void modify() {
+		try {
+		
+			for(IMethod m: callerMethods){
+				m = this.init(m);
+				ArrayList<MethodInvocation> miList = this.getMethodInvocationStatement(m);
+				for(MethodInvocation inv: miList){
+					m = this.init(m);
+					MethodInvocation newInv = classUnit.getAST().newMethodInvocation();
+					newInv = (MethodInvocation)ASTNode.copySubtree(newInv.getAST(), inv);
+					newInv.setExpression(newInv.getAST().newSimpleName(this.fieldIdentifier));
+					rewrite = ASTRewrite.create(inv.getParent().getAST());
+					rewrite.replace(inv, newInv, null);
+					super.save();
+				}
+				
+			}
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}	
+	}
+	
+	private ArrayList<MethodInvocation> getMethodInvocationStatement(IMethod m){
+		invocation.clear();
+		try {
+			MethodDeclaration md = super.getMethodDecl(m);
+			md.accept(new ASTVisitor(){
+				public boolean visit(MethodInvocation inv){
+					if(this.isMatched(inv)){
+						invocation.add(inv);
+					}
+					return true;
+				}
+				
+//				public boolean visit(SimpleName inv){
+//					System.out.println(inv);
+//					return true;
+//				}
+				private boolean isMatched(MethodInvocation inv){
+					if(inv.resolveMethodBinding()==null){
+						return true;
+					}
+					return false;
+				}
+			});
+		} catch (JavaModelException e) {
+			e.printStackTrace();
+		}
+		
+		return invocation;
+	}
+	
+	protected IMethod init(IMethod caller) throws JavaModelException{
+		
+			setICompilationUnit(caller);
+			setCompilationUnit();
+			setDocument();
+			setMethodDecl(classUnit, caller);
+			IMethod m = (IMethod) cu.getElementAt(md.getStartPosition());
+			
+			return m;
+		
+		
+	}
+	
+	private void setMethodDecl(CompilationUnit classUnit, final IMethod method) {
+		classUnit.accept(new ASTVisitor() {
+
+		    @Override
+		    public boolean visit(final MethodDeclaration node) {
+		        
+				try {
+					
+					String param[] = this.getParam(node);
+			        String param2[] = Signature.getParameterTypes(method.getSignature());
+			        param2 = this.getSimpleName(param2);
+			        
+			        if(method.getElementName().equals(node.getName().getIdentifier()) && isSame(param, param2)){
+			        	md = node;
+			        }
+				} catch (IllegalArgumentException | JavaModelException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+		        
+		        return true;
+		    }
+		    
+		    private String[] getSimpleName(String[] compiled){
+		    	String[] simpleName = new String[compiled.length];
+		    	for(int i =0 ; i < compiled.length ; i++){
+		    		simpleName[i] = Signature.getSignatureSimpleName(compiled[i]);
+		    	}
+		    	
+		    	return simpleName;
+		    }
+		    
+		    private String[] getParam(MethodDeclaration node){
+		    	String[] parameters = new String[node.parameters().size()];
+		        for (int i = 0 ; i < node.parameters().size() ; i ++) {
+		        	Object parameter = node.parameters().get(i);
+		            VariableDeclaration variableDeclaration = (VariableDeclaration) parameter;
+		            String type = variableDeclaration.getStructuralProperty(SingleVariableDeclaration.TYPE_PROPERTY)
+		                    .toString();
+		            for (int k = 0; k < variableDeclaration.getExtraDimensions(); k++) {
+		                type += "[]";
+		            }
+		            parameters[i] = type;
+		        }
+		        
+		        return parameters;
+		    }
+		    
+		    
+
+		});
+	}
+	
+	private static boolean isSame(String[] param1, String[] param2){
+    	if(param1.length!=param2.length) return false;
+    	for(int i = 0 ; i < param1.length ; i++){
+    		if(!param1[i].trim().equals(param2[i].trim())){
+    			return false; 
+    		}
+    	}
+    	return true;
+    }
+	
+	private static String[] getParam(String[] types){
+    	String[] parameters = new String[types.length];
+    	for(int i = 0 ; i < types.length ; i++){
+    		parameters[i] = types[i].split(" ")[0];
+    	}
+    	
+    	return parameters;
+    }
+	
+
+	private void setICompilationUnit(IMethod caller) {
+		String fileName = caller.getDeclaringType().getTypeRoot().findPrimaryType().getElementName() + ".java";
+		IPackageFragment package1 = caller.getDeclaringType().getPackageFragment();
+		cu = package1.getCompilationUnit(fileName);
+		
+		try {
+			workingCopy = cu.getWorkingCopy(new NullProgressMonitor());
+		} catch (JavaModelException e) {
+			e.printStackTrace();
+		}
+	}
+
+}

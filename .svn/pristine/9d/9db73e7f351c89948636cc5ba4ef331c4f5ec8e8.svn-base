@@ -1,0 +1,548 @@
+package zuna.mining;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Vector;
+
+import org.jgap.Chromosome;
+import org.jgap.Configuration;
+import org.jgap.FitnessFunction;
+import org.jgap.Gene;
+import org.jgap.Genotype;
+import org.jgap.IChromosome;
+import org.jgap.impl.DefaultConfiguration;
+
+import zuna.mining.gap.MyFitnessFunction;
+import zuna.mining.gap.MyGene;
+import zuna.mining.hac.agglomeration.AgglomerationMethod;
+import zuna.mining.hac.agglomeration.AverageLinkage;
+import zuna.mining.hac.worldpeace.ClusterTool;
+import zuna.model.MyMethod;
+import zuna.model.MyParameter;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.operator.ParameterMutator;
+
+public class LongParameterAnalyer {
+
+	private List<MyMethod> methods;
+	
+	//private Map<ParameterPair, Double> probabilityMap = new HashMap<ParameterPair, Double>();
+
+	public LongParameterAnalyer(List<MyMethod> methods) {
+		super();
+		this.methods = methods;
+	}
+
+	public void analyze() {
+		
+		expertment();
+	}
+
+	private void expertment() {
+		
+		List<MyMethod> cohesiveMethods = getCohesiveMethods();
+
+		List<MyParameter> allParameters = getAllParameters(cohesiveMethods);
+		
+		Map<ParameterPair, Double> relatednessMap = analyzeRelatednessOfParameters(allParameters);
+		
+		try {
+			
+			for (int i = 0; i < cohesiveMethods.size(); i++) {
+				
+				for (int j = i + 1; j < cohesiveMethods.size(); j++) {
+
+					MyMethod m1 = (MyMethod) cohesiveMethods.get(i).clone();
+					MyMethod m2 = (MyMethod) cohesiveMethods.get(j).clone();
+
+					ParameterMutator mutator = new ParameterMutator(m1, m2);
+					
+					MyMethod mergedMethod = mutator.merge();
+
+					Vector<ArrayList<MyParameter>> setOfCluter = cluster(relatednessMap, mergedMethod, new AverageLinkage(), 0.5);
+
+					Vector<ArrayList<MyParameter>> selectedCluter = this.selectTwoClusters(setOfCluter);
+
+					if (setOfCluter.size() == 1)
+						continue;
+
+					double fmeasure = mutator.getFmeasure(selectedCluter.get(0), selectedCluter.get(1));
+
+					System.out.println(m1.getID() + ":" + m2.getID() + ":" + fmeasure);
+
+					m1 = null;
+					m2 = null;
+				}
+			}
+
+		}
+		catch (CloneNotSupportedException | NullPointerException e) {
+			
+			e.printStackTrace();
+			
+			System.out.println("-_-;;");
+		}
+	}
+	
+	private List<MyParameter> getAllParameters(List<MyMethod> methods) {
+		
+		Map<String, MyParameter> map = new HashMap<String, MyParameter>();
+		
+		for (MyMethod myMethod : methods) {
+			
+			ArrayList<MyParameter> parameters = myMethod.getParameters();
+			
+			for (MyParameter myParameter : parameters) {
+				
+				if (!map.containsKey(myParameter.getName())) {
+					
+					map.put(myParameter.getName(), myParameter);
+				}
+			}
+		}
+		
+		return new ArrayList<>(map.values());
+	}
+	
+	private List<MyMethod> getCohesiveMethods() {
+		
+		List<MyMethod> cohesiveMethods = new ArrayList<MyMethod>();
+		
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.net.ClientHttpRequest.post(URL String Object )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.gui.plaf.palette.PaletteSliderThumbIcon.PaletteSliderThumbIcon(Image int boolean )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.io.Base64.OutputStream.write(byte[] int int )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.gui.event.GenericListener.getTargetMethod(Object String Class[] )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.io.Base64.decode4to3(byte[] int byte[] int )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.gui.VerticalGridLayout.VerticalGridLayout(int int int int )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.draw.locator.RelativeDecoratorLocator.RelativeDecoratorLocator(double double boolean )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.draw.locator.BezierLabelLocator.BezierLabelLocator(double double double )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.beans.AbstractBean.firePropertyChange(String boolean boolean )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.gui.JSheet.showMessageSheet(Component Object SheetListener )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.util.Methods.invoke(Object String String )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.xml.DOMOutput.addAttribute(String int int )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.geom.DoubleStroke.DoubleStroke(double double )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.draw.print.DrawingPageable.printPage(Graphics PageFormat int )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.gui.plaf.palette.BackdropBorder.UIResource.UIResource(Border Border )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.samples.teddy.regex.Matcher.Matcher(Document String boolean MatchType )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.geom.Bezier.findCorners(List<Double> double double )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.util.Methods.invokeStatic(String String Class<?>[] Object[] )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.gui.plaf.palette.PaletteLookAndFeel.installColorsAndFont(JComponent String String String )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.draw.action.ButtonFactory.addAlignmentButtonsTo(JToolBar DrawingEditor )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.draw.AbstractFigure.fireAttributeChanged(AttributeKey<T> T T )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.draw.decoration.ArrowTip.ArrowTip(double double double )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.draw.action.ImageBevelBorder.ImageBevelBorder(Image Insets Insets )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.app.action.file.SaveFileAction.SaveFileAction(Application View boolean )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.draw.event.TransformRestoreEdit.TransformRestoreEdit(Figure Object Object )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("net.n3.nanoxml.IXMLBuilder.elementAttributesProcessed(String String String )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.draw.ImageFigure.setImage(byte[] BufferedImage )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.draw.handle.ConnectionEndHandle.canConnect(Connector Connector )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.geom.Bezier.removeClosePoints(List<Double> double )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.app.MDIApplication.WindowMenuHandler.WindowMenuHandler(JMenu View )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.draw.event.SetBoundsEdit.SetBoundsEdit(AbstractFigure Double Double Double Double )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.util.Methods.invokeStatic(Class<?> String Class<?>[] Object[] )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.samples.draw.DrawingPanel.addDefaultCreationButtonsTo(JToolBar DrawingEditor Collection<Action> Collection<Action> )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.util.Methods.invokeStatic(Class<?> String )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.color.CIELCHabColorSpace.fromRGB(float[] float[] )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.app.action.window.MinimizeWindowAction.MinimizeWindowAction(Application View )"));
+		cohesiveMethods.add(ProjectAnalyzer.project.getMethod("org.jhotdraw.net.ClientHttpRequest.post(URL Map<String,String> Map<String,Object> )"));
+
+		return cohesiveMethods;
+	}
+
+	private Vector<ArrayList<MyParameter>> selectTwoClusters(Vector<ArrayList<MyParameter>> clusters) {
+		
+		Vector<ArrayList<MyParameter>> selectedClusters = new Vector<ArrayList<MyParameter>>();
+
+		List<IndexAndSise> list = new ArrayList<IndexAndSise>();
+		
+		for (int i = 0; i < clusters.size(); i++) {
+			
+			ArrayList<MyParameter> arrayList = clusters.get(i);
+			
+			list.add(new IndexAndSise(i, arrayList.size()));
+		}
+		
+		Collections.sort(list);
+		
+		
+		if (list.size() == 1) {
+		
+			int index = list.get(0).getIndex();
+			
+			selectedClusters.add(clusters.get(index));
+			selectedClusters.add(clusters.get(index));
+		}
+		else {
+			
+			int index1 = list.get(0).getIndex();
+			int index2 = list.get(1).getIndex();
+			
+			selectedClusters.add(clusters.get(index1));
+			selectedClusters.add(clusters.get(index2));
+		}
+		
+		return selectedClusters;
+	}
+	
+	private class IndexAndSise implements Comparable<IndexAndSise> {
+		
+		private int index;
+		private int size;
+		
+		public IndexAndSise(int index, int size) {
+			super();
+			this.index = index;
+			this.size = size;
+		}
+
+		public int getIndex() {
+			return index;
+		}
+
+		public void setIndex(int index) {
+			this.index = index;
+		}
+
+		public int getSize() {
+			return size;
+		}
+
+		public void setSize(int size) {
+			this.size = size;
+		}
+
+		@Override
+		public int compareTo(IndexAndSise o) {
+			// TODO Auto-generated method stub
+			int result;
+			
+			if (this.size == o.size) {
+				
+				result = 0;
+			}
+			else if(this.size < o.size) {
+				
+				result = 1;
+			}
+			else {
+				
+				result = -1;
+			}
+			
+			return result;
+		}
+	}
+	
+	private boolean isConflict(MyMethod m1, MyMethod myMethod) {
+		
+		for (MyParameter p1 : m1.getParameters()) {
+			
+			for (MyParameter p2 : myMethod.getParameters()) {
+				
+				if (p1.getName().equals(p2.getName())) {
+					
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	private Vector<ArrayList<MyParameter>> cluster(Map<ParameterPair, Double> relatednessMap, MyMethod myMethod, AgglomerationMethod agglomerationMethod, double threshold) {
+	
+		ArrayList<MyParameter> parameters = myMethod.getParameters();
+		
+		double[][] matrix = createProbatilityMatrix(relatednessMap, parameters);
+		
+		return ClusterTool.createSetOfCluters(parameters, matrix, agglomerationMethod, threshold, false);
+	}
+	
+	private void clusterAndPrint(AgglomerationMethod agglomerationMethod, double threshold) {
+		
+//		SimpleDateFormat format = new SimpleDateFormat("HHmmss");
+//		
+//		DecimalFormat decimalFormat = new DecimalFormat("0.00");
+//		
+//		String file = "JHotDraw_" + decimalFormat.format(threshold) + "_" + format.format(new Date()) + ".txt";
+//		
+//		String path = "D:\\hamd\\대학원\\실험\\롱파라메터실험_131220\\" + file;
+//		
+//		MyFileWriter out = new MyFileWriter();
+//		
+//		out.init(path);
+//		
+//		for (MyMethod myMethod : methods) {
+//			
+//			if (myMethod.getParameterCount() > 1) {
+//
+//				ArrayList<MyParameter> parameters = myMethod.getParameters();
+//				
+//				double[][] matrix = createProbatilityMatrix(parameters);
+//				
+//				Vector<ArrayList<MyParameter>> setOfCluters = ClusterTool.createSetOfCluters(parameters, matrix, agglomerationMethod, threshold, false);
+//				
+//				out.print(myMethod.getID());
+//				out.print("\t");
+//				
+//				out.print("[");
+//				
+//				for (MyParameter parameter : parameters) {
+//					
+//					out.print(parameter);
+//					out.print(", ");
+//				}
+//				
+//				out.print("]");
+//				out.print("\t");
+//				
+//				out.print(myMethod.getParameterCount());
+//				out.print("\t");
+//				
+//				out.print(setOfCluters.size());
+//				out.print("\t");
+//				
+//				for (ArrayList<MyParameter> clusters : setOfCluters) {
+//					
+//					out.print("[");
+//					
+//					for (MyParameter parameter : clusters) {
+//						
+//						out.print(parameter);
+//						out.print(", ");
+//					}
+//					
+//					out.print("], ");
+//				}
+//				
+//				out.print("\n");
+//			}
+//		}
+//		
+//		out.close();
+	}
+	
+	private double[][] createProbatilityMatrix(Map<ParameterPair, Double> relatednessMap, List<MyParameter> parameters) {
+
+		int size = parameters.size();
+		
+		double[][] matrix = new double[size][size];
+		
+		for (int i = 0; i < size; i++) {
+
+			for (int j = 0; j < size; j++) {
+
+				if (i == j) {
+					
+					matrix[i][j] = 0.0;
+				}
+				else {
+					
+					MyParameter first = parameters.get(i);
+					MyParameter second = parameters.get(j);
+					
+					ParameterPair key = new ParameterPair(first, second);
+					
+					double a = relatednessMap.get(key);
+					double b = relatednessMap.get(key.swap());
+
+					matrix[i][j] = Math.max(a, b);
+				}
+			}
+		}
+		
+		return matrix;
+	}
+
+	private Map<ParameterPair, Double> analyzeRelatednessOfParameters(List<MyParameter> parameters) {
+		
+		Map<ParameterPair, Double> relatednessMap = new HashMap<ParameterPair, Double>();
+		
+		for (int i = 0; i < parameters.size(); i++) {
+			
+			for (int j = i; j < parameters.size(); j++) {
+				
+				MyParameter first = parameters.get(i);
+				MyParameter second = parameters.get(j);
+				
+				ParameterPair parameterPair = new ParameterPair(first, second);
+				
+				double relatedness;
+				
+				relatedness = getRelatedness(parameterPair);
+				
+				relatednessMap.put(parameterPair, relatedness);
+				
+				if (first != second) {
+				
+					ParameterPair swappedParameterPair = parameterPair.swap();
+					
+					relatedness = getRelatedness(swappedParameterPair);
+					
+					relatednessMap.put(swappedParameterPair, relatedness);
+				}
+			}
+		}
+		
+		return relatednessMap;
+//		for (MyMethod method : methods) {
+//			
+//			if (method.getParameterCount() > 1) {
+//			
+//				List<MyParameter> parameters = method.getParameters();
+//				
+//				for (MyParameter myParameter : parameters) {
+//				
+//					List<ParameterPair> parameterPairs = ParameterPair.createParameterPairs(myParameter, parameters);
+//					
+//					for (ParameterPair parameterPair : parameterPairs) {
+//				
+//						if (!probabilityMap.containsKey(parameterPair)) {
+//
+//							double relatedness = getRelatedness(parameterPair);
+//							
+//							probabilityMap.put(parameterPair, relatedness);
+//						}
+//					}
+//				}
+//			}
+//		}
+	}
+	
+	private double getRelatedness(ParameterPair parameterPair) {
+		
+		MyParameter first = parameterPair.getFirst();
+		MyParameter second = parameterPair.getSecond();
+		
+		int count1 = getMethodCount(first.getName());
+		int count2 = getMethodCount(first.getName(), second.getName());
+
+		double relatedness = (count2 == 0) ? 0.0 : ((double) count2 / (double) count1);
+		
+		return relatedness;
+	}
+	
+	private void calculateClusteringQuality() {
+		
+//		for (MyMethod method : methods) {
+//			
+//			if (method.getParameterCount() > 1) {
+//			
+//				List<MyParameter> parameters = method.getParameters();
+//				
+//				System.out.print(method.getID());
+//				
+//				startGA(parameters, 100, 100);
+//			}
+//		}
+	}
+	
+	private void startGA(Map<ParameterPair, Double> probabilityMap, List<MyParameter> parameters, int sizeOfPopulation, int evolveLoop) {
+		
+		Configuration.reset();
+		
+		Configuration conf = new DefaultConfiguration();
+		
+		FitnessFunction myFunc = new MyFitnessFunction(probabilityMap);
+		
+		try {
+			
+			conf.setFitnessFunction(myFunc);
+
+			int size = parameters.size();
+			
+			Gene[] sampleGenes = new Gene[size];
+
+			for (int i = 0; i < size; i++) {
+				
+				sampleGenes[i] = new MyGene(conf, 0, 1, parameters.get(i)); // Pennies
+			}
+
+			Chromosome sampleChromosome = new Chromosome(conf, sampleGenes);
+
+			conf.setSampleChromosome(sampleChromosome);
+			conf.setPopulationSize(sizeOfPopulation);
+
+			Genotype population = Genotype.randomInitialGenotype(conf);
+
+			for (int i = 0; i < evolveLoop; i++) {
+				
+				population.evolve();
+			}
+			
+			IChromosome cur = population.getFittestChromosome();
+			
+			System.out.print("\t");
+			
+			for (int i = 0; i < cur.getGenes().length; i++) {
+				
+				Gene gene = cur.getGene(i);
+				
+				if (gene instanceof MyGene) {
+					
+					MyGene myGene = (MyGene) gene;
+					
+					System.out.print(myGene.getParameter().getName());
+					System.out.print(";");
+				}
+			}
+			
+			System.out.print("\t");
+			
+			for (int i = 0; i < cur.getGenes().length; i++) {
+				
+				System.out.print(cur.getGene(i).getAllele());
+			}
+			
+			System.out.print("\t");
+
+			System.out.println(cur.getFitnessValue());
+		}
+		catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			
+			throw new RuntimeException(e);
+		}
+	}
+	
+	private int getMethodCount(String e) {
+		
+		int count = 0;
+		
+		for (MyMethod method : methods) {
+			
+			if (method.getIdentifier().contains(e)) {
+				
+				count++;
+			}
+		}
+		
+		return count;
+	}
+	
+	private int getMethodCount(String e1, String e2) {
+		
+		int count = 0;
+		
+		for (MyMethod method : methods) {
+			
+			if (method.getIdentifier().contains(e1, e2)) {
+				
+				count++;
+			}
+		}
+		
+		return count;
+	}
+
+	public List<MyMethod> getMethods() {
+		return methods;
+	}
+
+	public void setMethods(List<MyMethod> methods) {
+		this.methods = methods;
+	}
+}

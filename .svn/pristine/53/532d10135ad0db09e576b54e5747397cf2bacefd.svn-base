@@ -1,0 +1,81 @@
+package zuna.mining;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.List;
+
+import zuna.model.MyIdentifier;
+import zuna.model.MyMethod;
+import zuna.model.MyParameter;
+import zuna.refactoring.ProjectAnalyzer;
+
+public class AssociationMiningTool {
+
+	private List<String> terms;
+	private List<Database> databases;
+	private Hashtable<String, MethodSet> methodSets = new Hashtable<String, MethodSet>();
+	
+	
+	
+	public Hashtable<String, MethodSet> getMethodSets() {
+		return methodSets;
+	}
+
+	public void init(List<Database> databases, List<String> terms) {
+		
+		this.databases = databases;
+		this.terms = terms;
+		
+	}
+	
+	public void makeCorpus() {
+		
+		for(String term: terms){
+			if(!methodSets.containsKey(term)) methodSets.put(term, new MethodSet());
+			for (int i = 0; i < databases.size(); i++) {
+				if(databases.get(i).getElementCount(term)>0){
+					methodSets.get(term).add2Set(databases.get(i));
+				}
+			}
+		}
+	}
+	
+	public List<String> getTerms() {
+		return terms;
+	}
+
+	public void setTerms(List<String> terms) {
+		this.terms = terms;
+	}
+
+	public List<Database> getDatabases() {
+		return databases;
+	}
+
+	public void setDatabases(List<Database> databases) {
+		this.databases = databases;
+	}
+	
+	public class MethodSet{
+		ArrayList<Database> set = new ArrayList<Database>();
+
+		public MethodSet() {
+			
+		}
+		
+		public MethodSet(ArrayList<Database> set) {
+			this.set = set;
+		}
+
+		
+		public void add2Set(Database element) {
+			this.set.add(element);
+		}
+
+
+		public ArrayList<Database> getSet() {
+			return set;
+		}
+	}
+}

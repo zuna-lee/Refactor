@@ -1,0 +1,59 @@
+package zuna.refactoring.code;
+
+import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaModelException;
+
+import zuna.model.MyClass;
+import zuna.model.MyMethod;
+import zuna.refactoring.ProjectAnalyzer;
+
+public class MethodMoveChanger extends ChangeRewrite{
+
+	private IType targetType;
+	private IMethod movingIMethod;
+	private MyMethod m;
+	private MyClass source;
+	private MyClass target;
+	
+	public MethodMoveChanger(MyClass source, MyClass target, IType targetType, IMethod movingIMethod, MyMethod m){
+		this.targetType = targetType;
+		this.movingIMethod = movingIMethod;
+		this.m = m;
+		this.source =source;
+		this.target = target;
+	}
+	@Override
+	public void changeProject() {
+		this.removeMethodFromSourceClass();
+		this.addMethodFromTargetClass();
+		ProjectAnalyzer.project.getClassList().put(source.getID(), source);
+		ProjectAnalyzer.project.getClassList().put(target.getID(), target);
+		ProjectAnalyzer.project.getMethodList().put(this.m.getID(), m);
+	}
+	
+	private void removeMethodFromSourceClass() {
+		for(int i = 0 ; i < source.getOwnedMethods().size(); i++){
+			if(source.getOwnedMethods().get(i).getID().equals(this.m.getID())){
+				source.getOwnedMethods().remove(i);
+				break;
+			}
+		}
+	}
+
+	private void addMethodFromTargetClass() {
+		this.m.setParent(this.target);
+		target.getOwnedMethods().add(this.m);
+	}
+	
+	@Override
+	protected void modify() {
+		try {
+			movingIMethod.move(targetType, null, this.m.getName(), false, new NullProgressMonitor());
+		} catch (JavaModelException e) {
+			e.printStackTrace();
+		}
+	}
+
+}

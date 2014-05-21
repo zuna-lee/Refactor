@@ -1,0 +1,263 @@
+package zuna.refactoring.ui.views.classDecomposesrViews.graph;
+
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Vector;
+
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.util.KeyMaker;
+import edu.uci.ics.jung.algorithms.shortestpath.Distance;
+import edu.uci.ics.jung.graph.UndirectedSparseGraph;
+
+public class MyGraph {
+
+	public static Hashtable<Integer, int[]> table = new Hashtable<Integer, int[]>();
+	UndirectedSparseGraph<MyNode, MyLink> g;
+	private Vector<Vector<String>> clusters = new Vector<Vector<String>>();
+	private Hashtable<String, Double> matrix = new Hashtable<String, Double>();
+    	 
+	public MyGraph(Vector<Vector<String>> clusters, Hashtable<String, Double> matrix){
+		MyGraph.table.clear();
+		this.clusters = clusters;
+		this.matrix = matrix;
+		g = new UndirectedSparseGraph<MyNode, MyLink>();
+		this.createGraph();
+	}
+	
+	private void createGraph(){
+
+		int noOfCluster = 0;
+		for(Vector<String> cluster: clusters){
+			for(String c: cluster){
+				this.createNode(c, noOfCluster, clusters.size());
+			}
+			noOfCluster++;
+		}
+		
+		noOfCluster = 0;
+		for(Vector<String> cluster: clusters){
+
+			this.createIntraEdge(cluster, noOfCluster);
+			noOfCluster++;
+		}
+		
+		this.createInterEdge(clusters);
+	}
+	
+	private void createNode(String id, int noOfCluster, int totClusters){
+		boolean isMethod = ProjectAnalyzer.project.getMethodList().containsKey(id);
+		MyNode node = new MyNode(id, noOfCluster, totClusters, isMethod);
+		g.addVertex(node);
+	}
+	
+	private void createInterEdge(Vector<Vector<String>> clusters){
+		for(int i = 0 ; i < clusters.size()-1 ; i++){
+			for(int k = i ; k < clusters.size() ; k++){
+				Vector<String> source = clusters.get(i);
+				Vector<String> target = clusters.get(k);
+				
+				for(int srcIdx = 0 ; srcIdx < source.size() ; srcIdx++){
+					for(int tgtIdx = 0 ; tgtIdx < target.size() ; tgtIdx++){
+						String src = source.get(srcIdx);
+						String tgt = target.get(tgtIdx);
+						
+						if(!src.equals(tgt) && src.endsWith(")") && tgt.endsWith(")")){
+							String w = "";
+							String key = KeyMaker.getKey(src, tgt);
+							if(matrix.containsKey(key)){
+								w = String.valueOf(matrix.get(key));
+							}else{
+								w = String.valueOf(matrix.get(KeyMaker.getKey(tgt, src)));
+							}
+							
+							MyNode c1Node = getNode(src);
+							MyNode c2Node = getNode(tgt);
+							
+							if(c1Node!=null && c2Node!=null){
+								g.addEdge(new MyLink(w, i, false), c1Node, c2Node);
+							}
+							
+						}
+					}
+					
+				}
+				
+			}
+		}
+	}
+	
+	private void createIntraEdge(Vector<String> cluster, int noOfCluster){
+		
+		for(int idx1 = 0 ; idx1 < cluster.size()-1 ; idx1++){
+			for(int idx2 = idx1 ; idx2 < cluster.size() ; idx2++){
+				String c1 = cluster.get(idx1);
+				String c2 = cluster.get(idx2);
+				if(!c1.equals(c2)){
+					String key = KeyMaker.getKey(c1, c2);
+					String w = "";
+					
+					if(!c2.endsWith(")") || !c1.endsWith(")")){
+						
+					}else{
+						if(matrix.containsKey(key)){
+							w = String.valueOf(matrix.get(key));
+						}else{
+							w = String.valueOf(matrix.get(KeyMaker.getKey(c2, c1)));
+						}
+					}
+					
+					MyNode c1Node = getNode(c1);
+					MyNode c2Node = getNode(c2);
+					
+					if(c1Node!=null && c2Node!=null){
+						g.addEdge(new MyLink(w, noOfCluster, true), c1Node, c2Node);
+					}
+					
+				}
+				
+			}
+		}
+	}
+	
+	private MyNode getNode(String id){
+		Iterator<MyNode> nodes = g.getVertices().iterator();
+		
+		while(nodes.hasNext()){
+			MyNode n = nodes.next();
+			if(n.id.equals(id)) return n;
+		}
+		
+		return null;
+	}
+	
+	
+	class MyLink {
+		 
+		 public String id;
+		 public boolean intra;
+		 public int cluster;
+		 
+		 public MyLink(String id, int cluster, boolean intra) {
+			 this.id = id;
+			 this.cluster = cluster;
+			 this.intra = intra;
+		 }
+		 
+		 public boolean isIntra(){
+			 return intra;
+		 }
+		 public String toString() { // Always good for debugging
+			 if(id.length()>4) id = id.substring(0, 4);
+			 return id;
+		 }
+		 
+	}
+
+	class MyNode {
+		 public String id;
+		 public boolean method;
+		 public int cluster;
+		 public int totClusters;
+		 public int[] rgb;
+		 public float H;
+		 public float S;
+		 public float B;
+		 
+		 public MyNode(String id, int cluster, int totClusters, boolean method) {
+			 this.method = method;
+			 this.id = id;
+			 this.cluster = cluster;
+			 int[] rgb = this.getRGB(cluster, totClusters);
+			 MyGraph.table.put(cluster, rgb);
+			 this.H = this.getH(cluster, totClusters);
+			 this.S = this.getS(cluster, totClusters);
+			 this.B = this.getB(cluster, totClusters);
+		 }
+		 
+	     public boolean isMethod() {
+			return method;
+		}
+
+	    private int[] getRGB(int cluster, int totClusters){
+	    	rgb = new int[3];
+	    	
+	    	if(cluster==0){
+	    		rgb[0] = 255;
+	    		rgb[1] = 0;
+	    		rgb[2] = 0;
+	    		
+	    	}else if(cluster==1){
+	    		rgb[0] = 0;
+	    		rgb[1] = 255;
+	    		rgb[2] = 0;
+	    		
+	    	}else if(cluster==2){
+	    		rgb[0] = 0;
+	    		rgb[1] = 0;
+	    		rgb[2] = 255;
+	    		
+	    	}else if(cluster==3){
+	    		rgb[0] = 120;
+	    		rgb[1] = 120;
+	    		rgb[2] = 0;
+	    		
+	    	}else if(cluster==4){
+	    		rgb[0] = 120;
+	    		rgb[1] = 0;
+	    		rgb[2] = 120;
+	    		
+	    	}else if(cluster==5){
+	    		rgb[0] = 0;
+	    		rgb[1] = 120;
+	    		rgb[2] = 120;
+	    		
+	    	}else if(cluster==6){
+	    		rgb[0] = 60;
+	    		rgb[1] = 60;
+	    		rgb[2] = 0;
+	    		
+	    	}else if(cluster==7){
+	    		rgb[0] = 0;
+	    		rgb[1] = 60;
+	    		rgb[2] = 60;
+	    		
+	    	}else if(cluster==8){
+	    		rgb[0] = 60;
+	    		rgb[1] = 0;
+	    		rgb[2] = 60;
+	    		
+	    	}else if(cluster==9){
+	    		rgb[0] = 30;
+	    		rgb[1] = 30;
+	    		rgb[2] = 30;
+	    		
+	    	}
+	    	
+	    	return rgb;
+	    }
+
+		private float getH(int currentCluster, int totClusters){
+	     	float c = 0.0f;
+	     	c = (float)360/(float)totClusters *(float)(currentCluster+1);
+	     	return c;
+	     }
+	     
+	     private float getS(int currentCluster, int totClusters){
+	     	float c = 0.0f;
+	     	c = (float)100/(float)totClusters *(float)(currentCluster+1);
+	     	return c;
+	     }
+	     
+	     private float getB(int currentCluster, int totClusters){
+	     	float c = 0.0f;
+	     	c = (float)100 - ((float)100/(float)totClusters *(float)(currentCluster+1));
+	     	return c;
+	     }
+		 public String toString() { // Always a good idea for debuging
+			 String[] token = id.split("\\.");
+			 return token[token.length-1]; // JUNG2 makes good use of these.
+		 }
+	}
+	
+}

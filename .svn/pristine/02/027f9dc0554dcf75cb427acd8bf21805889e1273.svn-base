@@ -1,0 +1,137 @@
+package zuna.mining;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import zuna.model.MyParameter;
+
+public class ParameterPair {
+
+	private MyParameter first;
+	private MyParameter second;
+	
+	public ParameterPair(MyParameter first, MyParameter second) {
+		super();
+		this.first = first;
+		this.second = second;
+	}
+
+	public static List<ParameterPair> createParameterPairs(List<MyParameter> subSet, List<MyParameter> parameters) {
+		
+		List<ParameterPair> pairSet = new ArrayList<ParameterPair>();
+
+		for (MyParameter parameter : parameters) {
+			
+			if (!subSet.contains(parameter)) {
+				
+				for (MyParameter sub : subSet) {
+					
+					MyParameter first = parameter;
+					MyParameter second = sub;
+					
+					ParameterPair pair = new ParameterPair(first, second);
+					
+					pairSet.add(pair);
+				}
+			}
+		}
+		
+		return pairSet;
+	}
+	
+	public static List<ParameterPair> createParameterPairs(MyParameter p, List<MyParameter> parameters) {
+		
+		List<ParameterPair> pairSet = new ArrayList<ParameterPair>();
+		
+		for (MyParameter parameter : parameters) {
+			
+			if (p != parameter) {
+				
+				MyParameter first = p;
+				MyParameter second = parameter;
+				
+				ParameterPair pair = new ParameterPair(first, second);
+				
+				pairSet.add(pair);
+			}
+		}
+		
+		return pairSet;
+	}
+	
+	public static List<ParameterPair> createParameterPairs(List<MyParameter> parameters) {
+		
+		List<ParameterPair> pairSet = new ArrayList<ParameterPair>();
+		
+		for (int i = 0; i < parameters.size() - 1; i++) {
+		
+			for (int j = i + 1; j < parameters.size(); j++) {
+				
+				MyParameter first = parameters.get(i);
+				MyParameter second = parameters.get(j);
+				
+				ParameterPair pair = new ParameterPair(first, second);
+				
+				pairSet.add(pair);
+			}
+		}
+		
+		return pairSet;
+	}
+	
+	public ParameterPair swap() {
+		
+		ParameterPair newParameterPair = new ParameterPair(second, first);
+		
+		return newParameterPair;
+	}
+	
+	public MyParameter getFirst() {
+		return first;
+	}
+	public void setFirst(MyParameter first) {
+		this.first = first;
+	}
+	public MyParameter getSecond() {
+		return second;
+	}
+	public void setSecond(MyParameter second) {
+		this.second = second;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((first == null) ? 0 : first.hashCode());
+		result = prime * result + ((second == null) ? 0 : second.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		ParameterPair other = (ParameterPair) obj;
+		if (first == null) {
+			if (other.first != null)
+				return false;
+		} else if (!first.equals(other.first))
+			return false;
+		if (second == null) {
+			if (other.second != null)
+				return false;
+		} else if (!second.equals(other.second))
+			return false;
+		return true;
+	}
+
+	@Override
+	public String toString() {
+		return "[" + first + " : " + second + "]";
+	}
+}

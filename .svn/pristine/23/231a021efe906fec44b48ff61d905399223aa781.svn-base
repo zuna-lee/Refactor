@@ -1,0 +1,5 @@
+package zuna.model;
+
+public class DBRepo {
+
+}

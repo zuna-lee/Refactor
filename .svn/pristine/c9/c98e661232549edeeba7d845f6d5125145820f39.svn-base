@@ -1,0 +1,163 @@
+package zuna.refactoring.operator.decompose;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Vector;
+
+import org.eclipse.core.resources.IProject;
+
+import zuna.clustering.Clustering;
+import zuna.metric.LLDMetric;
+import zuna.metric.cohesion.FCC2;
+import zuna.model.MyClass;
+import zuna.model.MyMethod;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.operator.Analyzer;
+import zuna.refactoring.ui.actions.ClassDecomposer;
+import zuna.util.KeyMaker;
+import zuna.util.MethodFilter;
+
+public class RealLargeClass extends Analyzer{
+
+	private MyClass lc;
+	private Clustering clusterer;
+	private LLDMetric metric;
+	private double max = 0;
+	private double min = 100000;
+	private Vector<Vector<String>> result = new Vector<Vector<String>>();
+	private double th;
+	private double wf;
+	private Hashtable<String, Double> matrix = new Hashtable<String, Double>();
+	
+	public RealLargeClass(MyClass lc, IProject iproject, Clustering clusterer) {
+		this.clusterer = clusterer;
+		this.lc = lc;
+	}
+	public void setWeighingFactor(double wf){
+		this.wf = wf;
+	}
+	public Vector<Vector<String>> getResult() {
+		return result;
+	}
+
+	public Hashtable<String, Double> getMatrix() {
+		return matrix;
+	}
+	
+	
+
+	public void setResult(Vector<Vector<String>> result) {
+		this.result = result;
+	}
+	public void setMatrix(Hashtable<String, Double> matrix) {
+		this.matrix = matrix;
+	}
+	
+	@Override
+	public void analyze() {
+		this.metric = new FCC2(ProjectAnalyzer.project, this.lc);
+		ArrayList<String> obv = this.getObv(lc);
+		matrix = this.getMatrix(obv);
+		this.clusterer.setObv(obv);
+		this.clusterer.setMatrix(matrix);
+
+		max = 0;
+		min = 10000;
+		this.getTh(matrix);
+		double scale = (max-min)/100;
+		th = max - (scale*wf);
+		this.clusterer.clustering(lc, metric, th);
+		this.result = this.clusterer.getResult();
+		this.result = this.adjustResult(this.result);
+	}
+	
+	private Vector<Vector<String>> adjustResult(Vector<Vector<String>> result){
+		Vector<Integer> removeIdx = new Vector<Integer>();
+		
+		for(int idx = 0; idx < result.size();idx++){
+			Vector<String> r = result.get(idx);
+			if(r.size()<2){
+				for(int loc = 0; loc < result.size();loc++){
+					if(idx!=loc){
+						if(this.hasSimilarElement(r, result.get(loc))){
+							result.get(loc).addAll(r);
+							removeIdx.add(idx);
+						}
+					}
+				}
+			}
+		}
+		
+		for(int idx: removeIdx){
+			result.remove(idx);
+		}
+		
+		return result;
+	}
+	
+	private boolean hasSimilarElement(Vector<String> cluster1, Vector<String> cluster2){
+		
+		for(String c1: cluster1){
+			for(String c2: cluster2){
+				try{
+					double distance = this.matrix.get(c1 + ":" + c2);
+	 				if(distance<=th) {
+						return true;
+					}
+				}catch(NullPointerException e){
+					System.out.println();
+				}
+				
+			}
+		}
+		
+		return false;
+	}
+	
+	private void printConsole(Vector<Vector<String>> result){
+		int i = 0;
+		for(Vector<String> r: result){
+			System.out.println("cluster" + i++);
+			for(String m: r){
+				System.out.println(m);
+			}
+		}
+	}
+
+	public ArrayList<String> getObv(MyClass c){
+		
+		ArrayList<String> obv = new ArrayList<String>();
+		
+		for(MyMethod m1: c.getOwnedMethods()){
+			if(MethodFilter.isTarget(m1)){
+				obv.add(m1.getID());
+			}
+		}
+		
+		return obv;
+	}
+	
+	public Hashtable<String, Double> getMatrix(ArrayList<String> obv){
+		Hashtable<String, Double> matrix = new Hashtable<String, Double>(); 	
+		for(int i = 0 ; i < obv.size()-1 ; i++){
+			for(int j = i+1 ; j < obv.size() ; j++){
+				MyMethod m1 = ProjectAnalyzer.project.getMethod(obv.get(i));
+				MyMethod m2 = ProjectAnalyzer.project.getMethod(obv.get(j));
+				double similarity = metric.getMetric(m1,m2);
+				double distance = 1-similarity;
+				matrix.put(KeyMaker.getKey(obv.get(i), obv.get(j)), distance);
+				matrix.put(KeyMaker.getKey(obv.get(j), obv.get(i)), distance);
+			}
+		}
+		return matrix;
+	}
+	
+	private void getTh(Hashtable<String, Double> matrix){
+		for(String key: matrix.keySet()){
+			double entry = matrix.get(key);
+			
+			if(entry>max) max = entry;
+			if(entry<min) min = entry;
+		}
+	}
+}

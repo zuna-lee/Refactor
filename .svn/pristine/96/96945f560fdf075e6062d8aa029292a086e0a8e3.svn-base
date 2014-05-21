@@ -1,0 +1,1230 @@
+package zuna.model;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.List;
+
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.Annotation;
+import org.eclipse.jdt.core.dom.AnonymousClassDeclaration;
+import org.eclipse.jdt.core.dom.ArrayAccess;
+import org.eclipse.jdt.core.dom.ArrayCreation;
+import org.eclipse.jdt.core.dom.ArrayInitializer;
+import org.eclipse.jdt.core.dom.AssertStatement;
+import org.eclipse.jdt.core.dom.Assignment;
+import org.eclipse.jdt.core.dom.Block;
+import org.eclipse.jdt.core.dom.BodyDeclaration;
+import org.eclipse.jdt.core.dom.BooleanLiteral;
+import org.eclipse.jdt.core.dom.BreakStatement;
+import org.eclipse.jdt.core.dom.CastExpression;
+import org.eclipse.jdt.core.dom.CatchClause;
+import org.eclipse.jdt.core.dom.CharacterLiteral;
+import org.eclipse.jdt.core.dom.ClassInstanceCreation;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.ConditionalExpression;
+import org.eclipse.jdt.core.dom.ConstructorInvocation;
+import org.eclipse.jdt.core.dom.ContinueStatement;
+import org.eclipse.jdt.core.dom.DoStatement;
+import org.eclipse.jdt.core.dom.EmptyStatement;
+import org.eclipse.jdt.core.dom.EnhancedForStatement;
+import org.eclipse.jdt.core.dom.EnumDeclaration;
+import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.ExpressionStatement;
+import org.eclipse.jdt.core.dom.FieldAccess;
+import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.ForStatement;
+import org.eclipse.jdt.core.dom.IMethodBinding;
+import org.eclipse.jdt.core.dom.IPackageBinding;
+import org.eclipse.jdt.core.dom.ITypeBinding;
+import org.eclipse.jdt.core.dom.IfStatement;
+import org.eclipse.jdt.core.dom.InfixExpression;
+import org.eclipse.jdt.core.dom.InstanceofExpression;
+import org.eclipse.jdt.core.dom.LabeledStatement;
+import org.eclipse.jdt.core.dom.MarkerAnnotation;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.Name;
+import org.eclipse.jdt.core.dom.NullLiteral;
+import org.eclipse.jdt.core.dom.NumberLiteral;
+import org.eclipse.jdt.core.dom.PackageDeclaration;
+import org.eclipse.jdt.core.dom.ParenthesizedExpression;
+import org.eclipse.jdt.core.dom.PostfixExpression;
+import org.eclipse.jdt.core.dom.PrefixExpression;
+import org.eclipse.jdt.core.dom.QualifiedName;
+import org.eclipse.jdt.core.dom.ReturnStatement;
+import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
+import org.eclipse.jdt.core.dom.Statement;
+import org.eclipse.jdt.core.dom.StringLiteral;
+import org.eclipse.jdt.core.dom.SuperConstructorInvocation;
+import org.eclipse.jdt.core.dom.SuperFieldAccess;
+import org.eclipse.jdt.core.dom.SuperMethodInvocation;
+import org.eclipse.jdt.core.dom.SwitchCase;
+import org.eclipse.jdt.core.dom.SwitchStatement;
+import org.eclipse.jdt.core.dom.SynchronizedStatement;
+import org.eclipse.jdt.core.dom.ThisExpression;
+import org.eclipse.jdt.core.dom.ThrowStatement;
+import org.eclipse.jdt.core.dom.TryStatement;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.TypeDeclarationStatement;
+import org.eclipse.jdt.core.dom.TypeLiteral;
+import org.eclipse.jdt.core.dom.VariableDeclaration;
+import org.eclipse.jdt.core.dom.VariableDeclarationExpression;
+import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
+import org.eclipse.jdt.core.dom.WhileStatement;
+
+import zuna.metric.classDS.InformationContents;
+import zuna.metric.classDS.InheritanceBasedDS;
+import zuna.parser.visitor.MethodVisitor;
+
+public class Repo  implements Serializable {
+
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -5012298760929784285L;
+	private String name;
+	private static String tmpPackageName;
+	private  HashMap<String, MyPackage> packageList = new HashMap<String, MyPackage>();
+	private  HashMap<String, MyClass> classList = new HashMap<String, MyClass>();
+	
+	private  HashMap<String, MyMethod> methodList = new HashMap<String, MyMethod>();
+	private  HashMap<String, MyField> fieldList = new HashMap<String, MyField>();
+	private  HashMap<String, MyParameter> parameterList = new HashMap<String, MyParameter>();
+	
+	public static int totPackageNumber;
+	public static int totClassNumber;
+	public static int totMethodNumber;
+	
+	public Repo(String name) {
+		init();
+		this.name = name;
+	}
+		
+	public void setPackageList(HashMap<String, MyPackage> packageList) {
+		this.packageList = packageList;
+	}
+	
+	public void setMethodList(HashMap<String, MyMethod> methodList) {
+		this.methodList = methodList;
+	}
+
+	public void setFieldList(HashMap<String, MyField> fieldList) {
+		this.fieldList = fieldList;
+	}
+
+	public HashMap<String, MyField> getFieldList() {
+		return fieldList;
+	}
+
+	public MyPackage createPackage(String uri, IPackageFragment mypackage) {
+		MyPackage element = getPackage(uri);
+		MyPackage parent = null;
+		if( element == null) {
+			element = new MyPackage(uri, mypackage);
+			
+			String[] path = uri.split("\\.");
+			if(path.length > 1) {
+				String parentUri = uri.substring(0, uri.lastIndexOf(path[path.length-1]) -1 );
+				parent = getPackage(parentUri);
+				if(parent == null) {
+					parent = new MyPackage(parentUri, mypackage);
+				}
+				element.setParent(parent); 
+			}
+			packageList.put(uri, element);
+			if(element.getParent() != null) {
+				element.getParent().addPackageChild(element);
+			}
+		}
+		return element;
+	}
+	
+	public void createProjectPackage(MyPackage root, String uri, IPackageFragment mypackage) {
+		packageList.put(root.getID(), root);
+		MyPackage pack = createPackage(uri, mypackage);
+		if(!pack.getID().contains(".")){
+			pack.setParent(root);
+			root.addPackageChild(pack);
+		}
+	}
+
+	public MyClass createClass(TypeDeclaration typeDeclaration, CompilationUnit cu, MyPackage parent) {
+		
+		String outterClass = "";
+		
+		//Project 내부이기 때문에 superClass와 superInterfaces는 나중에 모두 만들어짐
+		ASTNode typeParent = typeDeclaration.getParent();
+		while(typeParent != null && typeParent  instanceof TypeDeclaration) {
+			//inner class
+			outterClass = ((TypeDeclaration) typeParent).getName() + "." + outterClass;
+			typeParent = typeParent.getParent();
+		}
+
+		String fullName = parent.getID() + "." + outterClass + typeDeclaration.getName(); 
+
+		MyClass newClass = getClass(fullName);
+		if(newClass == null) {
+			newClass = new MyClass(fullName, typeDeclaration, cu, parent);
+			if(outterClass.compareTo("") != 0) {
+				//inner class
+				newClass.setOutterClassUri(parent.getID() + "." + outterClass.substring(0, outterClass.length()-1));
+				
+			}
+		}
+		classList.put(fullName, newClass);
+		return newClass;
+	}
+		
+	public MyMethod createMethod(MethodDeclaration md, MyClass parent) {
+		
+		IMethodBinding methodBinding = md.resolveBinding();
+		List<SingleVariableDeclaration> singleVariableDeclarations = md.parameters();
+		
+		String methodFullName = MyMethod.makeMethodFullName(methodBinding);
+		
+		MyMethod newMethod = getMethod(methodFullName);
+		
+		if(newMethod == null) {	
+			newMethod =  new MyMethod(md, md.resolveBinding(), parent);
+			
+			List<String> identifiers = new ArrayList<String>();
+			
+			if(md.getBody() == null) {
+				
+				newMethod.setStatementCnt(0);
+				
+			} else {
+				newMethod.setStatementCnt(md.getBody().statements().size());
+				
+				Block body = md.getBody();
+				List<Statement> statements = body.statements();
+				for (Statement statement : statements) {
+					extractIdentifier(identifiers, statement);
+				}
+			}
+			
+			MyIdentifier myIdentifier = new MyIdentifier();
+			myIdentifier.setIdentifiers(identifiers);
+			
+			newMethod.setIdentifier(myIdentifier);
+			
+			ArrayList<MyParameter> parameters = MyParameter.createParameters(newMethod, singleVariableDeclarations);
+			
+			newMethod.setParameters(parameters);
+			
+			for (MyParameter myParameter : parameters) {
+			
+				parameterList.put(myParameter.getName(), myParameter);
+			}
+			
+			newMethod = this.setModifiers(md, newMethod, md.modifiers().iterator());
+			methodList.put(methodFullName, newMethod);
+		}
+		
+		return newMethod;
+	}
+	
+	
+	private void extractIdentifier(List<String> list, Statement statement) {
+		
+		if (statement instanceof AssertStatement) {
+			/*
+			 * 완료
+			 */
+			AssertStatement assertStatement = (AssertStatement) statement;
+			
+			extractIdentifier(list, assertStatement.getExpression());
+			extractIdentifier(list, assertStatement.getMessage());
+		}
+		else if (statement instanceof Block) {
+			/*
+			 * 완료
+			 */
+			Block block = (Block) statement;
+			
+			List<Statement> statements = block.statements();
+			
+			for (Statement s : statements) {
+				
+				extractIdentifier(list, s);
+			}
+		}
+		else if (statement instanceof BreakStatement) {
+			/*
+			 * 완료, 로직 없음
+			 */
+		}
+		else if (statement instanceof ConstructorInvocation) {
+			/*
+			 * 완료
+			 */
+			ConstructorInvocation constructorInvocation = (ConstructorInvocation) statement;
+			
+			List<Expression> arguments = constructorInvocation.arguments();
+			
+			for (Expression expression : arguments) {
+				
+				extractIdentifier(list, expression);
+			}
+		}
+		else if (statement instanceof ContinueStatement) {
+			/*
+			 * 완료, 로직 없음
+			 */
+		}
+		else if (statement instanceof DoStatement) {
+			/*
+			 * 완료
+			 */
+			DoStatement doStatement = (DoStatement) statement;
+			
+			extractIdentifier(list, doStatement.getBody());
+			
+			extractIdentifier(list, doStatement.getExpression());
+		}
+		else if (statement instanceof EmptyStatement) {
+			/*
+			 * 완료, 로직 없음
+			 */
+		}
+		else if (statement instanceof ExpressionStatement) {
+			/*
+			 * 완료
+			 */
+			ExpressionStatement expressionStatement = (ExpressionStatement) statement;
+			
+			extractIdentifier(list, expressionStatement.getExpression());
+		}
+		else if (statement instanceof ForStatement) {
+			/*
+			 * 완료
+			 */
+			ForStatement forStatement = (ForStatement) statement;
+			
+			List<Expression> initializers = forStatement.initializers();
+			
+			for (Expression i : initializers) {
+				
+				extractIdentifier(list, i);
+			}
+			
+			extractIdentifier(list, forStatement.getExpression());
+			
+			List<Expression> updaters = forStatement.updaters();
+			
+			for (Expression u : updaters) {
+				
+				extractIdentifier(list, u);
+			}
+			
+			extractIdentifier(list, forStatement.getBody());
+		}
+		else if (statement instanceof IfStatement) {
+			/*
+			 * 완료
+			 */
+			IfStatement ifStatement = (IfStatement) statement;
+			
+			extractIdentifier(list, ifStatement.getExpression());
+			
+			extractIdentifier(list, ifStatement.getThenStatement());
+			extractIdentifier(list, ifStatement.getElseStatement());
+		}
+		else if (statement instanceof LabeledStatement) {
+			/*
+			 * 완료
+			 */
+			LabeledStatement labeledStatement = (LabeledStatement) statement;
+			
+			extractIdentifier(list, labeledStatement.getBody());
+		}
+		else if (statement instanceof ReturnStatement) {
+			/*
+			 * 완료
+			 */
+			ReturnStatement returnStatement = (ReturnStatement) statement;
+			
+			extractIdentifier(list, returnStatement.getExpression());
+		}
+		else if (statement instanceof SuperConstructorInvocation) {
+			/*
+			 * 완료
+			 */
+			SuperConstructorInvocation superConstructorInvocation = (SuperConstructorInvocation) statement;
+			
+			List<Expression> arguments = superConstructorInvocation.arguments();
+			
+			for (Expression expression : arguments) {
+				
+				extractIdentifier(list, expression);
+			}
+			
+			extractIdentifier(list, superConstructorInvocation.getExpression());
+		}
+		else if (statement instanceof SwitchCase) {
+			/*
+			 * 완료
+			 */
+			SwitchCase switchCase = (SwitchCase) statement;
+			
+			extractIdentifier(list, switchCase.getExpression());
+		}
+		else if (statement instanceof SwitchStatement) {
+			/*
+			 * 완료
+			 */
+			SwitchStatement switchStatement = (SwitchStatement) statement;
+			
+			extractIdentifier(list, switchStatement.getExpression());
+			
+			List<Statement> statements = switchStatement.statements();
+			
+			for (Statement s : statements) {
+				
+				extractIdentifier(list, s);
+			}
+		}
+		else if (statement instanceof SynchronizedStatement) {
+			/*
+			 * 완료
+			 */
+			SynchronizedStatement synchronizedStatement = (SynchronizedStatement) statement;
+			
+			extractIdentifier(list, synchronizedStatement.getExpression());
+			
+			extractIdentifier(list, synchronizedStatement.getBody());
+		}
+		else if (statement instanceof ThrowStatement) {
+			/*
+			 * 완료
+			 */
+			ThrowStatement throwStatement = (ThrowStatement) statement;
+			
+			extractIdentifier(list, throwStatement.getExpression());
+		}
+		else if (statement instanceof TryStatement) {
+			/*
+			 * 완료
+			 */
+			TryStatement tryStatement = (TryStatement) statement;
+			
+			extractIdentifier(list, tryStatement.getBody());
+			
+			List<CatchClause> catchClauses = tryStatement.catchClauses();
+			
+			for (CatchClause catchClause : catchClauses) {
+				
+				SingleVariableDeclaration exception = catchClause.getException();
+				
+				extractIdentifier(list, exception.getInitializer());
+				
+				extractIdentifier(list, exception.getName());
+				
+				extractIdentifier(list, catchClause.getBody());
+			}
+			
+			extractIdentifier(list, tryStatement.getFinally());
+		}
+		else if (statement instanceof TypeDeclarationStatement) {
+			/*
+			 * 데이터 없음, 테스트 x
+			 */
+		}
+		else if (statement instanceof VariableDeclarationStatement) {
+			/*
+			 * 완료
+			 */
+			VariableDeclarationStatement variableDeclarationStatement = (VariableDeclarationStatement) statement;
+			
+			List<VariableDeclaration> fragments = variableDeclarationStatement.fragments();
+			
+			for (VariableDeclaration variableDeclaration : fragments) {
+				
+				extractIdentifier(list, variableDeclaration.getInitializer());
+				
+				extractIdentifier(list, variableDeclaration.getName());
+			}
+		}
+		else if (statement instanceof WhileStatement) {
+			/*
+			 * 완료
+			 */
+			WhileStatement whileStatement = (WhileStatement) statement;
+			
+			extractIdentifier(list, whileStatement.getExpression());
+			
+			extractIdentifier(list, whileStatement.getBody());
+		}
+		else if (statement instanceof EnhancedForStatement) {
+			/*
+			 * 완료
+			 */
+			EnhancedForStatement enhancedForStatement = (EnhancedForStatement) statement;
+			
+			extractIdentifier(list, enhancedForStatement.getExpression());
+			
+			SingleVariableDeclaration parameter = enhancedForStatement.getParameter();
+			
+			extractIdentifier(list, parameter.getInitializer());
+			
+			extractIdentifier(list, parameter.getName());
+			
+			extractIdentifier(list, enhancedForStatement.getBody());
+		}
+	}
+	
+	private void extractIdentifier(List<String> list, Expression expression) {
+		
+		if (expression instanceof Annotation) {
+			/*
+			 * 데이터 없음, 테스트 x
+			 */
+		}
+		else if (expression instanceof ArrayAccess) {
+			/*
+			 * 완료
+			 */
+			ArrayAccess arrayAccess = (ArrayAccess) expression;
+			
+			extractIdentifier(list, arrayAccess.getArray());
+			extractIdentifier(list, arrayAccess.getIndex());
+		}
+		else if (expression instanceof ArrayCreation) {
+			/*
+			 * 완료
+			 */
+			ArrayCreation arrayCreation = (ArrayCreation) expression;
+			
+			extractIdentifier(list, arrayCreation.getInitializer());
+		}
+		else if (expression instanceof ArrayInitializer) {
+			/*
+			 * 완료
+			 */
+			ArrayInitializer arrayInitializer = (ArrayInitializer) expression;
+			
+			List<Expression> expressions = arrayInitializer.expressions();
+			
+			for (Expression e : expressions) {
+				
+				extractIdentifier(list, e);
+			}
+		}
+		else if (expression instanceof Assignment) {
+			/*
+			 * 완료
+			 */
+			Assignment assignment = (Assignment) expression;
+			
+			extractIdentifier(list, assignment.getLeftHandSide());
+			extractIdentifier(list, assignment.getRightHandSide());
+		}
+		else if (expression instanceof BooleanLiteral) {
+			/*
+			 * 완료, 로직 없음
+			 */
+		}
+		else if (expression instanceof CastExpression) {
+			/*
+			 * 완료
+			 */
+			CastExpression castExpression = (CastExpression) expression;
+			
+			extractIdentifier(list, castExpression.getExpression());
+		}
+		else if (expression instanceof CharacterLiteral) {
+			/*
+			 * 완료, 로직 없음
+			 */
+		}
+		else if (expression instanceof ClassInstanceCreation) {
+			/*
+			 * 완료
+			 */
+			ClassInstanceCreation classInstanceCreation = (ClassInstanceCreation) expression;
+			
+			List<Expression> arguments = classInstanceCreation.arguments();
+			
+			for (Expression e : arguments) {
+				
+				extractIdentifier(list, e);
+			}
+			
+			AnonymousClassDeclaration anonymousClassDeclaration = classInstanceCreation.getAnonymousClassDeclaration();
+			
+			if (anonymousClassDeclaration != null) {
+				
+				List<BodyDeclaration> bodyDeclarations = anonymousClassDeclaration.bodyDeclarations();
+				
+				for (BodyDeclaration bodyDeclaration : bodyDeclarations) {
+					
+					if (bodyDeclaration instanceof MethodDeclaration) {
+						
+						MethodDeclaration methodDeclaration = (MethodDeclaration) bodyDeclaration;
+						
+						Block body = methodDeclaration.getBody();
+						
+						if (body != null) {
+							
+							List<SingleVariableDeclaration> parameters = methodDeclaration.parameters();
+							
+							for (SingleVariableDeclaration singleVariableDeclaration : parameters) {
+								
+								extractIdentifier(list, singleVariableDeclaration.getInitializer());
+								
+								extractIdentifier(list, singleVariableDeclaration.getName());
+							}
+							
+							List<Statement> statements = body.statements();
+							
+							for (Statement statement : statements) {
+								
+								extractIdentifier(list, statement);
+							}
+						}
+					}
+				}
+			}
+		}
+		else if (expression instanceof ConditionalExpression) {
+			/*
+			 * 완료
+			 */
+			ConditionalExpression conditionalExpression = (ConditionalExpression) expression;
+			
+			extractIdentifier(list, conditionalExpression.getExpression());
+			extractIdentifier(list, conditionalExpression.getThenExpression());
+			extractIdentifier(list, conditionalExpression.getElseExpression());
+		}
+		else if (expression instanceof FieldAccess) {
+			/*
+			 * 완료
+			 */
+			FieldAccess fieldAccess = (FieldAccess) expression;
+			
+			extractIdentifier(list, fieldAccess.getExpression());
+			
+			extractIdentifier(list, fieldAccess.getName());
+		}
+		else if (expression instanceof InfixExpression) {
+			/*
+			 * 완료
+			 */
+			InfixExpression infixExpression = (InfixExpression) expression;
+			
+			extractIdentifier(list, infixExpression.getLeftOperand());
+			extractIdentifier(list, infixExpression.getRightOperand());
+			
+			List<Expression> extendedOperands = infixExpression.extendedOperands();
+			
+			for (Expression e : extendedOperands) {
+				
+				extractIdentifier(list, e);
+			}
+		}
+		else if (expression instanceof InstanceofExpression) {
+			/*
+			 * 데이터 없음, 테스트 x
+			 */
+		}
+		else if (expression instanceof MethodInvocation) {
+			/*
+			 * 완료
+			 */
+			MethodInvocation methodInvocation = (MethodInvocation) expression;
+
+			extractIdentifier(list, methodInvocation.getExpression());
+			
+			List<Expression> arguments = methodInvocation.arguments();
+			
+			for (Expression e : arguments) {
+				
+				extractIdentifier(list, e);
+			}
+		}
+		else if (expression instanceof Name) {
+			/*
+			 * 완료
+			 */
+			extractIdentifier(list, (Name) expression);
+		}
+		else if (expression instanceof NullLiteral) {
+			/*
+			 * 완료, 로직 없음
+			 */
+		}
+		else if (expression instanceof NumberLiteral) {
+			/*
+			 * 완료, 로직 없음
+			 */
+		}
+		else if (expression instanceof ParenthesizedExpression) {
+			/*
+			 * 완료
+			 */
+			ParenthesizedExpression parenthesizedExpression = (ParenthesizedExpression) expression;
+			
+			extractIdentifier(list, parenthesizedExpression.getExpression());
+		}
+		else if (expression instanceof PostfixExpression) {
+			/*
+			 * 완료
+			 */
+			PostfixExpression postfixExpression = (PostfixExpression) expression;
+			
+			extractIdentifier(list, postfixExpression.getOperand());
+		}
+		else if (expression instanceof PrefixExpression) {
+			/*
+			 * 완료
+			 */
+			PrefixExpression prefixExpression = (PrefixExpression) expression;
+			
+			extractIdentifier(list, prefixExpression.getOperand());
+		}
+		else if (expression instanceof StringLiteral) {
+			/*
+			 * 완료, 로직 없음
+			 */
+		}
+		else if (expression instanceof SuperFieldAccess) {
+			/*
+			 * 완료
+			 */
+			SuperFieldAccess superFieldAccess = (SuperFieldAccess) expression;
+			
+			extractIdentifier(list, superFieldAccess.getName());
+		}
+		else if (expression instanceof SuperMethodInvocation) {
+			/*
+			 * 완료
+			 */
+			SuperMethodInvocation superMethodInvocation = (SuperMethodInvocation) expression;
+			
+			List<Expression> arguments = superMethodInvocation.arguments();
+			
+			for (Expression e : arguments) {
+				
+				extractIdentifier(list, e);
+			}
+		}
+		else if (expression instanceof ThisExpression) {
+			/*
+			 * 완료, 로직 없음
+			 */
+		}
+		else if (expression instanceof TypeLiteral) {
+			/*
+			 * 완료, 로직 없음
+			 */
+		}
+		else if (expression instanceof VariableDeclarationExpression) {
+			/*
+			 * 데이터 없음, 테스트 x
+			 */
+		}
+	}
+	
+	private void extractIdentifier(List<String> list, Name name) {
+		
+		if (name instanceof SimpleName) {
+			
+			SimpleName simpleName = (SimpleName) name;
+			
+			String identifier = simpleName.getIdentifier();
+			
+			list.add(identifier);
+		}
+		else if(name instanceof QualifiedName) {
+			
+			QualifiedName qualifiedName = (QualifiedName) name;
+			
+			extractIdentifier(list, qualifiedName.getQualifier());
+			
+			extractIdentifier(list, qualifiedName.getName());
+		}
+	}
+	
+	private MyMethod setModifiers(MethodDeclaration md, MyMethod newMethod, Iterator modifiers){
+		while(modifiers.hasNext()){
+			Object obj = modifiers.next();
+			if(obj instanceof MarkerAnnotation){
+				String modifier = ((MarkerAnnotation)obj).getTypeName().getFullyQualifiedName();
+				if(modifier.equals("Override")){
+					newMethod.setOverride(true);
+				}
+			}else if(obj instanceof Modifier){
+				String modifier = ((Modifier)obj).getKeyword().toString();
+				if(modifier.equals("static")){
+					newMethod.setStatic(true);
+				}
+			}
+		}
+		return newMethod;
+	}
+	
+	public HashMap<String, MyPackage> getPackageList() {
+		return packageList;
+	}
+	
+	public MyPackage getPackage(String key) {
+		return packageList.get(key);
+	}
+	
+	public HashMap<String, MyClass> getClassList() {
+		return classList;
+	}
+	
+	public HashMap<String, MyMethod> getMethodList() {
+		return methodList;
+	}
+	
+	public HashMap<String, MyParameter> getParameterList() {
+		return parameterList;
+	}
+
+
+
+	public MyClass getClass(String key) {
+		return classList.get(key);
+	}
+
+	public ArrayList<MyClass> findClass(String partialKey) {
+		ArrayList<MyClass> findResult = new ArrayList<>();
+		for (String key : classList.keySet()) {
+			if( key.contains(partialKey) ) {
+				findResult.add(getClass(key));
+			}
+		} 
+		return findResult;
+	}
+	
+	public MyMethod getMethod(String key) {
+		MyMethod result = methodList.get(key);
+		if(result == null) {
+			ArrayList<MyMethod> findList = null;
+			try {
+				String temp = key.substring(0, key.indexOf("("));
+				findList = this.findMethod(key.substring(0, key.indexOf("(")));
+
+				if(findList.size() == 0) {
+					return null;
+				}
+				String parameters = key.substring(key.indexOf("(") +1, key.length()-1);
+				if(parameters.length()==0) {
+					return null;
+				}
+				String[] parameterList = null;
+				parameterList = getIgnoreGeneric(parameters.trim().split(" "));
+
+				for(MyMethod candidate : findList) {
+					
+				}
+			}  catch (java.lang.StringIndexOutOfBoundsException e){
+				System.out.println("Test");
+			}
+		}
+		return result;
+	}
+
+	private String[] getIgnoreGeneric(String[] parameterList) {
+		String[] ignoredList = new String[parameterList.length];
+		for (int i = 0; i < parameterList.length; i++) {
+			if(parameterList[i].contains("<")) {
+				ignoredList[i] = parameterList[i].substring(0, parameterList[i].indexOf("<"));
+			} else {
+				ignoredList[i] = parameterList[i];
+			}
+		}
+		return ignoredList;
+	}
+
+	public ArrayList<MyMethod> findMethod(String partialKey) {
+		ArrayList<MyMethod> findResult = new ArrayList<>();
+		for (String key : methodList.keySet()) {
+			if( key.contains(partialKey) ) {
+				findResult.add(getMethod(key));
+			}
+		} 
+		return findResult;
+	}
+
+
+	public void init() {
+		InformationContents.maxIC = 0.0;
+		InheritanceBasedDS.max = -1;
+		packageList.clear();
+		classList.clear();
+		methodList.clear();
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	
+	public void makeClassNode(MyPackage pack, TypeDeclaration typeDeclaration, 
+			CompilationUnit cu, IPackageFragment mypackage) throws JavaModelException, Exception {
+
+		MyClass classChild;
+		MyMethod method;
+		classChild = createClass(typeDeclaration, cu, pack);
+		
+		for (FieldDeclaration fd : typeDeclaration.getFields()) {
+			
+			String[] names = fd.toString().split("\\=")[0].split(" ");
+			String name = classChild.getID() + "." + names[names.length-1].replace(";", "");
+			name = name.replace("\n", "");
+			String type = fd.getType().toString();
+			MyField newField = new MyField(name, type, classChild, fd);
+			classChild.addOwendField(newField);
+			fieldList.put(name, newField);
+		}
+
+		for (MethodDeclaration md : typeDeclaration.getMethods()) {
+			
+			method = createMethod(md, classChild);
+			if(md.getBody() == null)
+				continue;
+			methodList.put(method.getID(), method);
+		}
+	}
+
+
+	public ArrayList<MyMethod> makeFanOutList(Repo repo, MyMethod method, MethodDeclaration md) {
+		final Hashtable<String, MethodInvocation> methods = new Hashtable<String, MethodInvocation>();
+		final ArrayList<ClassInstanceCreation> objectCreation = new ArrayList<ClassInstanceCreation>();
+		final Hashtable<String, SimpleName> reference = new Hashtable<String, SimpleName>();
+		
+		ArrayList<MyMethod> add = new ArrayList<MyMethod>();
+		
+		md.accept(new ASTVisitor(){
+			
+			@Override
+			public boolean visit(MethodInvocation invo){
+				if(!methods.containsKey(invo.resolveMethodBinding().getKey())){
+					methods.put(invo.resolveMethodBinding().getKey(),invo);
+				}
+				
+				return true;
+			}
+			
+			@Override
+			public boolean visit(SimpleName ref){
+				
+				if(ref.getParent() instanceof MethodInvocation){
+					MethodInvocation inv = (MethodInvocation)ref.getParent();
+					if(!methods.containsKey(inv.resolveMethodBinding().getKey())){
+						methods.put(inv.resolveMethodBinding().getKey(),inv);
+					}
+				}
+				
+				reference.put(ref.getFullyQualifiedName(), ref);
+				
+				return true;
+			}
+			
+			@Override
+			public boolean visit(ClassInstanceCreation node){
+				objectCreation.add(node);
+				return true;
+			}
+		});
+		
+		
+		for(String key: reference.keySet()){
+			if(md.getParent() instanceof TypeDeclaration){
+				TypeDeclaration type = (TypeDeclaration ) md.getParent();
+				
+				tmpPackageName = "";
+				type.getRoot().accept(new ASTVisitor(){
+					@Override
+					public boolean visit(PackageDeclaration packageDecl){
+						tmpPackageName = packageDecl.getName().toString();
+						return true;
+					}
+				});
+				
+				SimpleName name = reference.get(key);
+				String fieldKey = tmpPackageName + "." + type.getName() + "." + name;
+				if(repo.fieldList.containsKey(fieldKey)) {
+					MyField f = repo.fieldList.get(fieldKey);
+					method.addReffedField(f);
+					f.addReferencingMethod(method);
+					repo.fieldList.put(fieldKey, f);
+				}
+			}else if(md.getParent() instanceof EnumDeclaration){
+				EnumDeclaration type = (EnumDeclaration ) md.getParent();
+				
+				tmpPackageName = "";
+				type.getRoot().accept(new ASTVisitor(){
+					@Override
+					public boolean visit(PackageDeclaration packageDecl){
+						tmpPackageName = packageDecl.getName().toString();
+						return true;
+					}
+				});
+				
+				SimpleName name = reference.get(key);
+				String fieldKey = tmpPackageName + "." + type.getName() + "." + name;
+				if(repo.fieldList.containsKey(fieldKey)) {
+					MyField f = repo.fieldList.get(fieldKey);
+					method.addReffedField(f);
+					f.addReferencingMethod(method);
+					repo.fieldList.put(fieldKey, f);
+				}
+			}
+			
+		}
+		
+		for (String key : methods.keySet()) {
+			MethodInvocation mdi = methods.get(key);
+			try {
+				MyMethod m = methodList.get(MyMethod.makeMethodFullName(mdi.resolveMethodBinding()));
+				
+				if(m!=null) {
+					method.addFanOutMethod(m);
+					
+				}
+//				else{
+//					MyMethod addm = makeLibHierarchy(mdi);
+//					method.addFanOutMethod(addm);
+//					
+//					add.add(addm);
+//				}
+				
+			} catch (NullPointerException | java.lang.NoSuchMethodError e) {
+				System.out.println(mdi.getName());
+				continue;
+			}
+		}
+		
+		for(ClassInstanceCreation creation: objectCreation){
+			String qualifiedName = this.getQualifiedName(creation.resolveConstructorBinding());
+			MyMethod constructor = repo.getMethodList().get(qualifiedName);
+			
+			if(constructor!=null){
+				method.addFanOutMethod(constructor);
+			}
+		}
+		
+		if(method.getFanOut().size()==0 && method.getReferencedField().size()==1 && method.getStatementCnt()==1){
+			method.setSupport(true);
+		}else{
+			method.setSupport(false);
+		}
+		
+		return add;
+	}
+	
+	
+	private MyMethod makeLibHierarchy(MethodInvocation inv){
+		ITypeBinding itb = inv.resolveMethodBinding().getDeclaringClass();
+		IPackageBinding ipb = itb.getPackage();
+		String methodName = getFullName(inv);
+		String name = inv.getName().getIdentifier();
+		
+		MyMethod m = methodList.get(methodName);
+		MyPackage p = packageList.get(ipb.getName());
+		MyClass c = classList.get(itb.getQualifiedName());
+		
+
+		
+		if(p==null){
+//			p = new MyPackage(ipb.getName(), true);
+			p = makeHeierarchy(ipb.getNameComponents(), p);
+		}
+		
+		if(c==null){
+			c = new MyClass(itb.getQualifiedName(), p);
+		}
+		
+		if(m==null){
+			m = new MyMethod(c.getID() + "." + methodName, name, true);
+		}
+		
+		m.setParent(c);
+		if(!contain(c, m)) c.addMethod(m);
+		if(!contain(p, c)) p.addClassChild(c);
+		
+		classList.put(c.getID(), c);
+//		methodList.put(m.getID(), m);
+		return m;
+	}
+	
+	private MyPackage makeHeierarchy(String[] parents, MyPackage cur){
+		String tmp = "";
+		String parent = "";
+		
+		for(int i = 0 ; i < parents.length ; i++){
+			String name = parents[i];
+			if(i==0) {
+				tmp+=name;
+				parent = "ROOT";
+			}else{
+				parent = tmp;
+				tmp+="."+name;
+			}
+			MyPackage p = packageList.get(tmp);
+			
+			if(p==null)
+			{
+				p = new MyPackage(tmp, true);
+				packageList.put(p.getID(), p);
+				MyPackage pp = packageList.get(parent);
+				pp.addPackageChild(p);
+				p.setParent(pp);
+			}
+		}
+		
+		return packageList.get(tmp);
+	}
+	
+	
+	private boolean contain(MyClass c, MyMethod m){
+		ArrayList<MyMethod> mlist = c.getOwnedMethods();
+		for(MyMethod method: mlist){
+			if(method.getID().equals(m.getID())){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private boolean contain(MyPackage p, MyClass c){
+		HashMap<String, MyClass> clist = p.getClassChildren();
+		for(String key: clist.keySet()){
+			if(key.equals(c.getID())){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private String getFullName(MethodInvocation inv){
+		String name = inv.getName().getIdentifier();
+		name += "(";
+		Iterator iter = inv.arguments().iterator();
+		
+		int cnt = 0;
+		while(iter.hasNext()){
+			Object obj = iter.next();
+			if(obj instanceof Expression){
+				Expression ex = ((Expression) obj);
+				if(ex.resolveTypeBinding()!=null)
+				{
+					String typeName = ex.resolveTypeBinding().getName();
+					name += typeName + " ";
+				}
+				
+			}else if(obj instanceof NullLiteral){
+				name += "null" + " ";
+			}
+			
+		}
+		
+		name += ")";
+		
+		return name;
+	}
+	
+	
+	public MyPackage createPackage(String uri) {
+		MyPackage element = getPackage(uri);
+		MyPackage parent = null;
+		if( element == null) {
+			element = new MyPackage(uri, true);
+			
+			String[] path = uri.split("\\.");
+			if(path.length > 1) {
+				String parentUri = uri.substring(0, uri.lastIndexOf(path[path.length-1]) -1 );
+				parent = getPackage(parentUri);
+				if(parent == null) {
+					parent = new MyPackage(parentUri, true);
+				}
+				element.setParent(parent); 
+			}
+			packageList.put(uri, element);
+			if(element.getParent() != null) {
+				element.getParent().addPackageChild(element);
+			}
+		}
+		return element;
+	}
+	
+	
+	private String getQualifiedName(IMethodBinding methodBinding){
+		ITypeBinding[] type = methodBinding.getParameterTypes();
+		String name = methodBinding.getDeclaringClass().getQualifiedName() + "." + methodBinding.getName();
+		String param = "";
+		name += "(";
+		for(ITypeBinding typeBinding: type)
+			param += typeBinding.getName() + " ";
+		
+		name += param;
+		name += ")";
+		
+		return name;
+	}
+	
+	
+
+	public void makeEnumNode(Repo repo, MyPackage pack, EnumDeclaration enumDeclaration, IPackageFragment mypackage) {
+		MyClass classChild;
+		MyMethod method;
+		
+		classChild = createClass(enumDeclaration, pack);
+		MethodVisitor methodVisitor = new MethodVisitor();
+		enumDeclaration.accept(methodVisitor);
+		
+		for (MethodDeclaration md : methodVisitor.getMethods()) {
+			method = createMethod(md, classChild);
+
+			if(md.getBody() == null)
+				continue;
+			
+			try {
+				makeFanOutList(repo, method, md);
+			} catch (Exception e) {
+				System.out.println("Exception Occured");
+				System.out.println("Mesage [" + md.getName());
+				throw e;
+			}
+		}
+		
+	}
+
+	private MyClass createClass(EnumDeclaration enumDeclaration, MyPackage parent) {
+		String outterClass = "";
+		
+		//Project 내부이기 때문에 superClass와 superInterfaces는 나중에 모두 만들어짐
+		ASTNode typeParent = enumDeclaration.getParent();
+		while(typeParent != null && typeParent  instanceof TypeDeclaration) {
+			//inner class
+			outterClass = ((TypeDeclaration) typeParent).getName() + "." + outterClass;
+			typeParent = typeParent.getParent();
+		}
+
+		String fullName = parent.getID() + "." + outterClass + enumDeclaration.getName(); 
+
+		MyClass newClass = getClass(fullName);
+		if(newClass == null) {
+			newClass = new MyClass(fullName, enumDeclaration, parent);
+			if(outterClass.compareTo("") != 0) {
+				//inner class
+				newClass.setOutterClassUri(parent.getID() + "." + outterClass.substring(0, outterClass.length()-1));
+				
+			}
+		}
+		classList.put(fullName, newClass);
+		return newClass;
+	} 
+}

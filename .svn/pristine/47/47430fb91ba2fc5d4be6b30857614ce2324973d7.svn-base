@@ -1,0 +1,150 @@
+package zuna.refactoring.operator.code.modifiers;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+
+import org.eclipse.jdt.core.dom.Assignment;
+import org.eclipse.jdt.core.dom.ClassInstanceCreation;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.ExpressionStatement;
+import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.ImportDeclaration;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.Modifier.ModifierKeyword;
+import org.eclipse.jdt.core.dom.SimpleType;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
+import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
+
+import zuna.model.MyClass;
+import zuna.model.MyField;
+import zuna.model.MyMethod;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.ui.operator.OperatorUtils;
+
+public class CallerClassModifier extends CodeModifier {
+	
+
+	public void modify(MyClass c, String newClass, MyClass oldClass, ArrayList<MyMethod> cluster1,
+			ArrayList<MyMethod> cluster2, ArrayList<MyMethod> callers){
+		
+		init(c);
+		OperatorUtils.openFile(c, ProjectAnalyzer.iproject);
+		createImportTo(newClass, oldClass);
+		createAttributeTo(newClass, callers, cluster2);
+		save();
+	}
+	
+	private  void createAttributeTo(String newClass, ArrayList<MyMethod> caller, ArrayList<MyMethod> cluster2) {
+		//get types
+		SimpleType left = astTarget.newSimpleType(astTarget.newSimpleName(newClass));
+		SimpleType right = astTarget.newSimpleType(astTarget.newSimpleName(newClass));
+		
+		//right side
+		ClassInstanceCreation cic = astTarget.newClassInstanceCreation();
+		cic.setType(right);
+		
+		//left side		
+		VariableDeclarationFragment frag = astTarget.newVariableDeclarationFragment();
+		frag.setName(astTarget.newSimpleName(newClass.toLowerCase() + "_att"));
+		exp = astTarget.newVariableDeclarationExpression(frag);
+		exp.setType(left);
+		exp.modifiers().add(this.astTarget.newModifier(ModifierKeyword.PRIVATE_KEYWORD));
+		
+		if(this.shouldBeStatic(caller, cluster2)){
+			exp.modifiers().add(this.astTarget.newModifier(ModifierKeyword.STATIC_KEYWORD));
+		}
+		
+		//assignment
+		Assignment assignment = astTarget.newAssignment();
+        assignment.setLeftHandSide(exp);
+        assignment.setRightHandSide(cic);
+        ExpressionStatement statement = astTarget.newExpressionStatement(assignment);
+		
+		//create ListRewrite
+		ListRewrite listRewrite = rewriter.getListRewrite(typeDecl, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
+		listRewrite.insertFirst(statement, null);
+	}
+
+	private boolean shouldBeStatic(ArrayList<MyMethod> cluster1, ArrayList<MyMethod> cluster2){
+		for(MyMethod m1: cluster1){
+			ArrayList<MyMethod> out = m1.getFanOut();
+			for(MyMethod o: out){
+				if(!this.isExtracted(cluster2, o) && m1.isStatic())
+					return true;
+			}
+		}
+		return false;
+	}
+	
+	
+	public  void deleteExtracted(MyClass c, ArrayList<MyMethod> cluster2, Hashtable<String, MyField> notSharedAttribute){
+		init(c);
+		
+		for(int i = 0 ; i < cluster2.size() ; i++){
+			rewriter.remove(getMethodDecl(cluster2.get(i)), null);
+		}
+		
+		for(String key: notSharedAttribute.keySet()){
+			MyField f = notSharedAttribute.get(key);
+			rewriter.remove(getFieldDecl(f), null);
+		}
+		save();
+	}
+	
+	private  FieldDeclaration getFieldDecl(MyField m){
+		FieldDeclaration decl=null;
+		FieldDeclaration[] declList = typeDecl.getFields();
+		
+		for(FieldDeclaration md: declList){
+			if(isMatched(md, m.getFd())){
+				decl = md;
+				break;
+			}
+		}
+		
+		return decl;
+	}
+	
+	private  MethodDeclaration getMethodDecl(MyMethod m){
+		MethodDeclaration decl=null;
+		MethodDeclaration[] declList = typeDecl.getMethods();
+		
+		for(MethodDeclaration md: declList){
+			if(isMatched(md, m.getMd())){
+				decl = md;
+				break;
+			}
+		}
+		
+		return decl;
+	}
+	
+	private  void createImportTo(String newClassName, MyClass oldClass) {
+		String packageName = this.getPackageName(oldClass);
+		String importStmt = packageName + "." + newClassName;
+		
+		ImportDeclaration importDecl = astTarget.newImportDeclaration();
+		importDecl.setName(astTarget.newName(importStmt));
+		ListRewrite importRewrite = rewriter.getListRewrite(cu, CompilationUnit.IMPORTS_PROPERTY);
+		importRewrite.insertFirst(importDecl, null);
+	}
+	
+	
+	private String getPackageName(MyClass c){
+		String[] tokens = c.getParent().getID().split("\\.");
+		String packageName = "";
+		for(int i = 0 ; i < tokens.length ; i++){
+			if(i==0){
+				packageName+= tokens[i];
+			}else{
+				packageName+= "." + tokens[i];
+			}
+			
+		}
+		
+		return packageName;
+	}
+	
+
+}

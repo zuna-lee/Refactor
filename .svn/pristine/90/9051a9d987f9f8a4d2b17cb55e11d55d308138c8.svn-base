@@ -1,0 +1,52 @@
+package zuna.refactoring.code;
+
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.JavaModelException;
+
+public class ClassCreateChanger extends ChangeRewrite {
+
+	private String name; 
+	private IPackageFragment ipackage;
+	
+	public ClassCreateChanger(String name, IPackageFragment ipackage){
+		this.name = name;
+		this.ipackage = ipackage;
+	}
+
+
+	@Override
+	public void changeProject() {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	protected void modify() {
+		// TODO Auto-generated method stub
+		try {
+			String cont = "";
+			cont = getHeader(name, ipackage, cont);
+			cont = getFooter(cont);
+			super.save(name, ipackage, cont);
+			
+		} catch (JavaModelException e) {
+			
+		}		
+	}
+	
+	private String getHeader(String name, IPackageFragment ipackage, String cont) {
+		if(!ipackage.getElementName().trim().equals("")){
+			cont +="package "+ ipackage.getElementName() +";\n\n";
+		}
+		
+		
+		cont +="\n public class " + name.split("\\.")[0] + "{ \n\n";
+		return cont;
+	}
+	
+	private String getFooter(String cont) {
+		cont+="}";
+		return cont;
+	}
+
+}

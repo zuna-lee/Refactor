@@ -1,0 +1,199 @@
+package zuna.refactoring.ui.actions;
+
+import java.util.Hashtable;
+import java.util.Vector;
+
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.runtime.IAdaptable;
+import org.eclipse.jdt.internal.core.CompilationUnit;
+import org.eclipse.jface.action.IAction;
+import org.eclipse.jface.viewers.ISelection;
+import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.ui.IViewPart;
+import org.eclipse.ui.IViewReference;
+import org.eclipse.ui.IWorkbenchWindow;
+import org.eclipse.ui.IWorkbenchWindowActionDelegate;
+import org.eclipse.ui.PartInitException;
+import org.eclipse.ui.PlatformUI;
+
+import zuna.clustering.HAC.HierarchicalClustering;
+import zuna.metric.classDS.ArchitectureBasedDS;
+import zuna.metric.classDS.ClassCouplingBasedDS;
+import zuna.metric.classDS.InheritanceBasedDS;
+import zuna.metric.cohesion.FCC2;
+import zuna.model.MyClass;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.operator.decompose.RealLargeClass;
+import zuna.refactoring.ui.views.DecomposedResultView;
+import zuna.refactoring.ui.views.classDecomposesrViews.ClassListView;
+
+@SuppressWarnings("restriction")
+public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
+	private static IWorkbenchWindow window;
+	public static double th=21;
+	/**
+	 * The constructor.
+	 */
+	public ClassDecomposer() {
+		
+	}
+
+	private void init(){
+		ProjectAnalyzer.project = null;
+		FCC2.max = -1;
+		ArchitectureBasedDS.max = -1;
+		InheritanceBasedDS.max = -1;
+		ClassCouplingBasedDS.max = -1;
+		ProjectAnalyzer.firstElement=null;
+		ArchitectureBasedDS.dsTable = new Hashtable<String, Double>();
+		InheritanceBasedDS.dsTable = new Hashtable<String, Double>();
+		ClassCouplingBasedDS.dsTable = new Hashtable<String, Double>();
+	}
+	
+	/**
+	 * The action has been activated. The argument of the
+	 * method represents the 'real' action sitting
+	 * in the workbench UI.
+	 * @see IWorkbenchWindowActionDelegate#run
+	 */
+	@SuppressWarnings("restriction")
+	@Override
+	public void run(IAction action) {
+		window = PlatformUI.getWorkbench().getActiveWorkbenchWindow();
+		if (window != null)
+		{
+			try{
+				IStructuredSelection selection = (IStructuredSelection) window.getSelectionService().getSelection();
+		        Object firstElement = selection.getFirstElement();
+		        if (firstElement instanceof IAdaptable)
+		        {
+		        	if(firstElement instanceof CompilationUnit){
+						CompilationUnit cu = (CompilationUnit)firstElement;
+			            IProject project = (IProject) cu.getJavaProject().getProject();
+			            
+			            if(ProjectAnalyzer.prjName==null || !ProjectAnalyzer.prjName.equals(project.getName())){
+				            init();
+				            System.out.println(project.getName() + " has been started");
+			            	ProjectAnalyzer.analyze(project);
+			            }
+			            
+		            	String classID = getClassID(cu);
+		            	MyClass lc = ProjectAnalyzer.project.getClass(classID);
+			            RealLargeClass rc = new RealLargeClass(lc, project, new HierarchicalClustering());
+			            rc.analyze();
+			            DecomposedResultView.result.clear();
+			            Vector<Vector<String>> result = rc.getResult();
+			            if(result.size()>1){
+			            	DecomposedResultView.result = result;
+			            	PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().showView("zuna.refactoring.ui.views.DecomposedResultView");
+			            }
+			            
+		        	}else{
+		        		init();
+			            IProject project = (IProject)((IAdaptable)firstElement).getAdapter(IProject.class);
+			            ProjectAnalyzer.firstElement = (IAdaptable)firstElement;
+			            System.out.println(project.getName() + " has been started");
+			            ProjectAnalyzer.analyze(project);
+			            ClassListView.flg=true;
+			            IViewReference[] views = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().getViewReferences();
+			            for(int i = 0 ; i < views.length; i++){
+			            	if(views[i].getId().equals("refactoring.views.classDecomposesrViews.ClassListView")){
+			            		
+			            		final IViewPart view = views[i].getView(true);
+			                    if (view instanceof ClassListView) {
+			                        final ClassListView resultViewer = (ClassListView) view;
+			                        resultViewer.redraw();
+			                    }
+			            		break;
+							}
+			            }
+						PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().showView("refactoring.views.classDecomposesrViews.ClassListView");
+		        	}
+		        }
+//		            IFile file = (IFile)((IAdaptable)firstElement).getAdapter(IFile.class);
+//		            System.out.println(file.getFullPath());
+//		            new IterativeProcess4MeasuringCohesion(project).analyze();
+//		            new LongParameter(project).analyze();
+//		            MutatedLargeClass lc = new MutatedLargeClass(project, new HierarchicalClustering());
+//		            lc.analyze();
+//		            ProjectAnalyzer.analyze(project);
+//		            MyClass lc = ProjectAnalyzer.project.getClass("req_tracer.rcp.Editor.ChangImpactAnalyzerComponent");
+//		            RealLargeClass rc = new RealLargeClass(lc, project, new HierarchicalClustering());
+//		            rc.analyze();
+		            
+//		            lc.analyze();
+//		            new DivergentChange(project).analyze();
+//		            new FindBug(project).analyze();
+//		            ProjectAnalyzer.analyze(project);
+//		            MetricGetter.measureAll(project, new FCC(ProjectAnalyzer.project));
+//		            System.out.println("LSCC end");
+//		            ProjectAnalyzer.analyze(project);
+//		            MetricGetter.measureAll(project, new FCC(ProjectAnalyzer.project));
+//		            MetricGetter.measureAll(project, new LSCC(ProjectAnalyzer.project));
+
+
+//		            MyClass lc = ProjectAnalyzer.project.getClass("zuna.refactoring.operator.divergentChange.DivergentChange");
+//		            new RealLargeClass(lc, project, new HierarchicalClustering()).analyze();
+//		            System.out.println("FCC end");
+//		            ProjectAnalyzer.analyze(project);
+//		            MetricGetter.measureAll(project);
+//		            System.out.println("C3 end");
+
+			}catch(java.lang.NullPointerException | java.lang.ClassCastException |PartInitException e){
+				e.printStackTrace();
+			}
+		}
+	}
+
+	private String getClassID(CompilationUnit cu) {
+		String classID = cu.getPath().toString().replace(cu.getPackageFragmentRoot().getPath().toString() + "/", "");
+		classID = classID.replace("/", ".");
+		classID = classID.substring(0, classID.length()-5);
+		return classID;
+	}
+
+	
+	/**
+	 * Selection in the workbench has been changed. We 
+	 * can change the state of the 'real' action here
+	 * if we want, but this can only happen after 
+	 * the delegate has been created.
+	 * @see IWorkbenchWindowActionDelegate#selectionChanged
+	 */
+	@Override
+	public void selectionChanged(IAction action, ISelection selection) {
+	}
+
+	/**
+	 * We can use this method to dispose of any system
+	 * resources we previously allocated.
+	 * @see IWorkbenchWindowActionDelegate#dispose
+	 */
+	@Override
+	public void dispose() {
+		
+	}
+
+	/**
+	 * We will cache window object in order to
+	 * be able to provide parent shell for the message dialog.
+	 * @see IWorkbenchWindowActionDelegate#init
+	 */
+	@Override
+	public void init(IWorkbenchWindow window) {
+		this.window = window;
+	}
+	
+	
+	
+//	private HashMap<String, MyMethod> getRefactoredMode(Repo p1, Repo p2){
+//		ArrayList<MyMethod> diff = ASTParserUtil.findDifferences(p1, p2);
+//		HashMap<String, MyMethod> changedMethods = new HashMap<String, MyMethod>(); 
+//		for(MyMethod m: diff){
+//			changedMethods.put(m.getID(), m);
+//		}
+//		
+//		return changedMethods;
+//	}
+
+}

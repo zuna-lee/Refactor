@@ -1,0 +1,49 @@
+package zuna.refactoring.experiment;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+
+import org.eclipse.core.resources.IProject;
+
+import zuna.metric.Metric;
+import zuna.metric.cohesion.FCC;
+import zuna.model.MyClass;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.util.Logger2File;
+
+public class MetricGetter {
+	public static void measureAll(IProject project, Metric metric){
+        
+        HashMap<String, String> classes = ProjectAnalyzer.project.getClassesInSystem();
+        ArrayList<String> metrics = new ArrayList<String>();
+        
+        for(String key: classes.keySet()){
+        	MyClass c= ProjectAnalyzer.project.getClass(key);
+        	if(!c.isInterface() && !c.isAbstract() && !c.isEnumuration())
+        		metrics.add(c.getID() + ":" +  c.getOwnedMethods().size() + ":" + metric.getMetric(c));
+        }
+        
+        Logger2File.print2CSVFile(metrics, metric.getClass().getName()+"_" + ProjectAnalyzer.prjName);
+	}
+	
+public static void measureAll(IProject project){
+        
+        HashMap<String, String> classes = ProjectAnalyzer.project.getClassesInSystem();
+        ArrayList<String> metrics = new ArrayList<String>();
+        
+        for(String key: classes.keySet()){
+        	MyClass c= ProjectAnalyzer.project.getClass(key);
+        	if(!(c.isLibrary() || c.isAbstract() || c.isEnumuration() || c.isInterface() 
+        			|| !c.getOutterClassUri().equals("java.lang.Object"))){
+        		Metric metric = new FCC(ProjectAnalyzer.project, c);
+        		double value = metric.getMetric(c);
+        		if(metric.getMethodCnt()>1)
+        			metrics.add(c.getID() + ":" +  metric.getMethodCnt() + ":" + value);	
+        	}
+        }
+        
+        Logger2File.print2CSVFile(metrics, "FCC2_" + ProjectAnalyzer.prjName);
+	}
+
+	
+}

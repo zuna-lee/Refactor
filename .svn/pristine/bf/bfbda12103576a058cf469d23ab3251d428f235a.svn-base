@@ -1,0 +1,218 @@
+package zuna.refactoring.ui.views.classDecomposesrViews;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Vector;
+
+import org.eclipse.jface.viewers.TableViewer;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Event;
+import org.eclipse.swt.widgets.Listener;
+import org.eclipse.swt.widgets.Table;
+import org.eclipse.swt.widgets.TableColumn;
+import org.eclipse.swt.widgets.TableItem;
+import org.eclipse.ui.IViewPart;
+import org.eclipse.ui.IViewReference;
+import org.eclipse.ui.PartInitException;
+import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.part.ViewPart;
+
+import zuna.clustering.HAC.HierarchicalClustering;
+import zuna.metric.MQFunction;
+import zuna.metric.cohesion.FCCAll;
+import zuna.model.MyClass;
+import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.experiment.decompose.RealLargeClass;
+import zuna.refactoring.ui.actions.ClassDecomposer;
+import zuna.refactoring.ui.views.classDecomposesrViews.graph.ResultViewer;
+import zuna.util.Sorter;
+
+public class ClassListView extends ViewPart{
+
+	private Composite parent;
+	private TableViewer viewer;
+    private FCCAll fcc;
+    
+	private ArrayList<String> sorted = new ArrayList<String>();
+	public static boolean flg = false;
+	private Table table;
+	private Vector<Vector<String>> result = new Vector<Vector<String>>();
+	private Hashtable<String, Double> matrix = new Hashtable<String, Double>();
+	public static RealLargeClass decomposer;
+	
+	@Override
+	public void createPartControl(Composite parent) {
+		this.parent = parent;
+		if(!flg){
+			PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().hideView(this);
+		}
+		fcc = new FCCAll(ProjectAnalyzer.project);
+		this.createTable(parent);
+	}
+	
+	private void createTable(final Composite parent) {
+		// Define the TableViewer
+		viewer = new TableViewer(parent, SWT.MULTI | SWT.H_SCROLL
+		      | SWT.V_SCROLL | SWT.FULL_SELECTION | SWT.BORDER);
+
+		// Make lines and make header visible
+		table = viewer.getTable();
+        decorateTable();
+	}
+
+	private void decorateTable() {
+		table.setLinesVisible(true);
+        table.setHeaderVisible(true);
+
+        GridData tableData = new GridData(GridData.FILL_BOTH);
+        tableData.horizontalSpan = 4;
+        tableData.verticalSpan = 3;
+        table.setLayoutData(tableData);
+
+		TableColumn column0 = new TableColumn(table, SWT.NONE);
+		column0.setText("Class");
+		column0.setWidth(300);
+		
+		TableColumn column1 = new TableColumn(table, SWT.NONE);
+		column1.setText("FCC");
+		column1.setWidth(60);
+
+		TableColumn column2 = new TableColumn(table, SWT.NONE);
+		column2.setText("AVG(FCC)");
+		column2.setWidth(80);
+		
+		TableColumn column3 = new TableColumn(table, SWT.NONE);
+		column3.setText("MQ");
+		column3.setWidth(60);
+		
+		TableColumn column4 = new TableColumn(table, SWT.NONE);
+		column4.setText("AVG(FCC)-MQ");
+		column4.setWidth(100);
+		
+		
+		getRowWithMQ(table);
+		table.addListener(SWT.DefaultSelection, new Listener() {
+		    @Override
+			public void handleEvent(Event e) {
+			    try{
+			    	String key  = table.getSelection()[0].getText();
+			    	MyClass lc = ProjectAnalyzer.project.getClass(key);
+		            RealLargeClass rc = new RealLargeClass(lc, ProjectAnalyzer.iproject, new HierarchicalClustering());
+		            
+//		            if(result.size()>1){
+		            	IViewPart v1 = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().findView("zuna.refactoring.ui.views.DecomposedResultView");
+		        		PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().hideView(v1);
+			            ResultViewer.wf = ClassDecomposer.th;
+			            ResultViewer.decomposer = rc;
+			            IViewReference[] views = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().getViewReferences();
+			            for(int i = 0 ; i < views.length; i++){
+			            	if(views[i].getId().equals("zuna.refactoring.ui.views.classDecomposesrViews.GraphicalDecomposisionResultViewer")){
+			            		
+			            		final IViewPart view = views[i].getView(true);
+			                    if (view instanceof ResultViewer) {
+			                        final ResultViewer resultViewer = (ResultViewer) view;
+			                        resultViewer.redraw(ResultViewer.wf, false);
+			                    }
+
+			            		break;
+							}
+			            }
+		            	PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().showView("zuna.refactoring.ui.views.classDecomposesrViews.GraphicalDecomposisionResultViewer");
+//		            }
+			    } catch (PartInitException e1) {
+					e1.printStackTrace();
+				}
+			}
+		});
+	}
+
+	public void redraw(){
+		fcc = new FCCAll(ProjectAnalyzer.project);
+		if(parent.getChildren().length>0){
+			parent.getChildren()[parent.getChildren().length-1].dispose();
+			this.createTable(parent);
+			parent.redraw();
+			parent.update();
+			parent.layout();
+		}
+	}
+	
+	private void getRowWithMQ(final Table table){
+		try{
+			Hashtable<String, Vector<Double>> metrics = this.getMetrics();
+			
+			for(String key: sorted){
+				if(!key.equals("")){
+					Vector<Double> values = metrics.get(key);
+					TableItem item = new TableItem(table, SWT.NONE);
+					item.setText(0, key);
+					item.setText(1, String.valueOf(values.get(0)));
+					item.setText(2, String.valueOf(values.get(1)));
+					item.setText(3, String.valueOf(values.get(2)));
+					item.setText(4, String.valueOf(values.get(3)));
+				}
+			}
+			
+			
+		}catch(java.lang.NullPointerException e){
+			PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage().hideView(this);
+		}
+	}
+	
+	private Hashtable<String, Vector<Double>> getMetricsFromNonExtractedEntities(){
+		Hashtable<String, Vector<Double>> metrics = new Hashtable<String, Vector<Double>>();
+		
+		return metrics;
+	}
+	
+	private Hashtable<String, Vector<Double>> getMetrics(){
+		Hashtable<String, Vector<Double>> metrics = new Hashtable<String, Vector<Double>>();
+		
+		try{
+			for(String key: ProjectAnalyzer.project.getClassList().keySet()){
+				MyClass c = ProjectAnalyzer.project.getClassList().get(key);
+				if(!(c.isAbstract() || c.isInterface())){
+					double fccValue = fcc.getMetric(c);
+					
+					this.clustering(c);
+					MQFunction mqFunc = new MQFunction(result, matrix);
+					double average = mqFunc.averageSimilarity();
+					double mq = mqFunc.getMQ(c);
+					if(!(Double.isNaN(fccValue) || fccValue==1.0 || fccValue==0.0 || average>=mq)){
+						Vector<Double> vValue = new Vector<Double>();
+						vValue.add(fccValue);
+						vValue.add(average);
+						vValue.add(mq);
+						vValue.add(mq-average);
+						metrics.put(c.getID(), vValue);
+					}
+				}
+			}
+
+		}catch(Exception e){
+			
+		}
+		
+		sorted = Sorter.sort(metrics, 3);
+		return metrics;
+	}
+	
+	
+	
+	private void clustering(MyClass lc){
+		RealLargeClass rc = new RealLargeClass(lc, ProjectAnalyzer.iproject, new HierarchicalClustering());
+		rc.setResult(new Vector<Vector<String>>());
+		rc.setMatrix(new Hashtable<String, Double>());
+		rc.setWeighingFactor(21);
+		rc.analyze();
+		result = rc.getResult();
+		matrix = rc.getMatrix();
+	}
+	
+	@Override
+	public void setFocus() {
+	}
+	
+}

@@ -1,0 +1,134 @@
+package zuna.clustering.GA;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Vector;
+
+import org.jgap.Chromosome;
+import org.jgap.Configuration;
+import org.jgap.FitnessFunction;
+import org.jgap.Gene;
+import org.jgap.Genotype;
+import org.jgap.IChromosome;
+import org.jgap.InvalidConfigurationException;
+import org.jgap.impl.DefaultConfiguration;
+import org.jgap.impl.IntegerGene;
+
+import zuna.clustering.Clustering;
+import zuna.metric.LLDMetric;
+import zuna.model.MyClass;
+import zuna.model.MyMethod;
+
+public class GAClustering implements Clustering{
+
+	private Vector<Vector<String>> result = new Vector<Vector<String>>();
+	private LLDMetric metric;
+	
+	public Vector<Vector<String>> getResult() {
+		return result;
+	}
+
+	public void setWeight(double w_ar, double w_inh, double w_cou){
+		
+	}
+	
+	public void clustering(MyClass c, LLDMetric metric, double th) {
+		this.metric = metric;
+		
+		try {
+			Hashtable<String, Double> matrix = this.getMatrix(c.getOwnedMethods());
+			Hashtable<Integer, String> geneVSMethodTable = new Hashtable<Integer, String>();
+			int size = c.getOwnedMethods().size();
+			Configuration conf = new DefaultConfiguration();
+			
+			Gene[] sampleGenes = new Gene[size];
+			for (int i = 0; i < size; i++) {
+				sampleGenes[i] = new IntegerGene(conf, 0, 1);
+				geneVSMethodTable.put(i, c.getOwnedMethods().get(i).getID());
+			}
+			
+			FitnessFunction mqFunc = new MQFitnessFunction(matrix, geneVSMethodTable);
+			conf.setFitnessFunction(mqFunc);
+			
+			Chromosome sampleChromosome = new Chromosome(conf, sampleGenes);
+
+			conf.setSampleChromosome(sampleChromosome);
+			conf.setPopulationSize(500);
+
+			Genotype population = Genotype.randomInitialGenotype(conf);
+			population.evolve();
+			IChromosome bestSolutionSoFar;
+			
+			for (int i = 0; i < 500; i++) {
+				population.evolve();
+//				IChromosome cur = population.getFittestChromosome();
+
+
+//				System.out.println(" : " + cur.getFitnessValue());
+			}
+			bestSolutionSoFar = population.getFittestChromosome();
+			System.out.println("The best solution contained the following: ");
+			for (int k = 0; k < bestSolutionSoFar.getGenes().length; k++)
+				System.out.print(bestSolutionSoFar.getGene(k).getAllele());
+			
+			System.out.println();
+			Configuration.reset();
+			makeResult(bestSolutionSoFar, geneVSMethodTable);
+		} catch (InvalidConfigurationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+	}
+	
+	private void makeResult(IChromosome ch, Hashtable<Integer, String> geneVSMethodTable){
+		Gene[] genes = ch.getGenes();
+		Vector<String> cluster1 = new Vector<String>();
+		Vector<String> cluster2 = new Vector<String>();
+		
+		for(int i = 0 ; i <  genes.length ; i++){
+			Gene g = genes[i];
+			if(g.getAllele().toString().equals("0")){
+				cluster1.add(geneVSMethodTable.get(i));
+			}else{
+				cluster2.add(geneVSMethodTable.get(i));
+			}
+		}
+		
+		this.result.add(cluster1);
+		this.result.add(cluster2);
+	}
+	
+	private Hashtable<String, Double> getMatrix(ArrayList<MyMethod> methods){
+		Hashtable<String, Double> matrix = new Hashtable<String, Double>();
+		
+		for(int i = 0 ; i < methods.size()-1 ; i++){
+			for(int j = i+1 ; j < methods.size() ; j++){
+				double ms = metric.getMetric(methods.get(i), methods.get(j));
+				matrix.put(methods.get(i).getID() + ":" + methods.get(j).getID(), ms);
+				matrix.put(methods.get(j).getID() + ":" + methods.get(i).getID(), ms);
+			}
+		}
+		return matrix;
+	}
+
+	@Override
+	public void setMatrix(Hashtable<String, Double> matrix) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void setObv(ArrayList<String> obv) {
+		// TODO Auto-generated method stub
+		
+	}
+
+//	@Override
+//	public void setMatrix(Hashtable<String, Double> matrix) {
+//		// TODO Auto-generated method stub
+//		
+//	}
+
+	
+}
