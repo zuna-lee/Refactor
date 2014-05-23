@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
+	<classpathentry kind="src" path="src"/>
 	<classpathentry exported="true" kind="lib" path="lib/tml-cmm-3.2.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
 	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins">
@@ -7,7 +8,6 @@
 			<accessrule kind="accessible" pattern="org/eclipse/jdt/internal/corext/refactoring/changes/*"/>
 		</accessrules>
 	</classpathentry>
-	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="lib" path="lib/jxl.jar"/>
 	<classpathentry kind="lib" path="lib/JUNG/collections-generic-4.01.jar"/>
 	<classpathentry kind="lib" path="lib/JUNG/colt-1.2.0.jar"/>

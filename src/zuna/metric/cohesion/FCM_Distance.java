@@ -17,7 +17,6 @@ public class FCM_Distance extends Metric{
 
 	@Override
 	public double getMetric(MyClass c) {
-		this.initDS();
 		ArrayList<MyMethod> methods = c.getOwnedMethods();
 		double cohesion = 0.0;
 		double cnt = 0.0;
@@ -66,7 +65,7 @@ public class FCM_Distance extends Metric{
 					}
 					
 				}catch(java.lang.NullPointerException e){
-					System.out.println(key);
+//					System.out.println(key);
 				}
 				
 			}
@@ -78,8 +77,5 @@ public class FCM_Distance extends Metric{
 		}
 	}
 	
-	private void initDS(){
-		new ArchitectureBasedDS();
-	}
 
 }

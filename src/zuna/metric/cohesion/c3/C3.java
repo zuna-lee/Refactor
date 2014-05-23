@@ -12,13 +12,12 @@ import java.util.Vector;
 
 import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.SimpleName;
-import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
 
 import tml.corpus.Corpus;
 import tml.corpus.CorpusParameters.DimensionalityReduction;
 import tml.corpus.CorpusParameters.TermSelection;
 import tml.corpus.RepositoryCorpus;
-import tml.storage.Repository;
+import tml.sql.DbConnection;
 import tml.vectorspace.TermWeighting.GlobalWeight;
 import tml.vectorspace.TermWeighting.LocalWeight;
 import tml.vectorspace.operations.PassagesSimilarity;
@@ -33,7 +32,7 @@ import Jama.Matrix;
 
 public class C3 extends Metric{
 
-	protected static Repository repository;
+	protected static TMLRepository repository;
 	protected static Properties prop;
 	private static PassagesSimilarity distance;
 	public static Hashtable<String, Double> msTable = new Hashtable<String, Double>();
@@ -56,12 +55,12 @@ public class C3 extends Metric{
 	@Override
 	public double getMetric(MyClass c) {
 		double values = 0.0;
-		this.getIdentifier(c);
+//		this.getIdentifier(c);
 		try {
 			
-			Repository.cleanStorage(this.file.getAbsolutePath());
-			repository = new Repository();
-			repository.addDocumentsInFolder(this.file.getAbsolutePath());
+			TMLRepository.cleanStorage(TMLConfiguration.getTmlFolder() + "/test/lucene");
+			repository = new TMLRepository(TMLConfiguration.getTmlFolder() + "/test/lucene");
+			repository.addMethods(c);
 			
 			Corpus corpus = new RepositoryCorpus();
 			corpus.getParameters().setTermSelectionCriterion(TermSelection.DF);
@@ -77,7 +76,6 @@ public class C3 extends Metric{
 			distance.start();
 			
 			final Vector<String> Observations = new Vector<String>();
-			
 			for (String doc : corpus.getPassages())
 				Observations.add(doc);
 			
@@ -91,13 +89,12 @@ public class C3 extends Metric{
 				}
 			}
 			values = values/((m.getRowDimension() * (m.getRowDimension()-1))/2);
-		
+			new DbConnection().close();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		
-		this.deleteFiles();
-		
+//		this.deleteFiles();
 		return values;
 	}
 	
@@ -115,41 +112,45 @@ public class C3 extends Metric{
 		methods = c.getOwnedMethods();
 		String corpus = "";
 		this.init();
-		for(int i = 0 ; i < methods.size() ; i++)
-		{
-			BufferedReader brOfMethodName = getIdentifierFromMethodName(i);
-			BufferedReader brOfMethodParam = getIdentifierFromParameters(i);
-			BufferedReader brOfMethodBody = getIdentifierFromMethodBody(i);
+		try {
 			
-			String terms = "";
-			
-			try {
-				String termTmp="";
-				while((termTmp = brOfMethodName.readLine())!=null)
-				{
-					terms += termTmp.trim().toLowerCase() + "\n";
-				}
+			for(int i = 0 ; i < methods.size() ; i++)
+			{
+				BufferedReader brOfMethodName = getIdentifierFromMethodName(i);
+				BufferedReader brOfMethodParam = getIdentifierFromParameters(i);
+				BufferedReader brOfMethodBody = getIdentifierFromMethodBody(i);
 				
-				while((termTmp = brOfMethodParam.readLine())!=null)
-				{
-					terms += termTmp.trim().toLowerCase() + "\n";
-				}
+				String terms = "";
 				
-				while((termTmp = brOfMethodBody.readLine())!=null)
-				{
-					terms += termTmp.trim().toLowerCase() + "\n";
-				}
 				
-			} catch (IOException e) {
-				e.printStackTrace();
+					String termTmp="";
+					while((termTmp = brOfMethodName.readLine())!=null)
+					{
+						terms += termTmp.trim().toLowerCase() + " ";
+					}
+					
+					while((termTmp = brOfMethodParam.readLine())!=null)
+					{
+						terms += termTmp.trim().toLowerCase() + " ";
+					}
+					
+					while((termTmp = brOfMethodBody.readLine())!=null)
+					{
+						terms += termTmp.trim().toLowerCase() + " ";
+					}
+					
+				
+				String id = methods.get(i).getID().replace(':', '_');
+				id = id.replace('<', '[');
+				id = id.replace('>', ']');
+				
+				corpus+= file.getAbsolutePath() + "/"+id + ".txt\n";
+				this.saveFiles(id, "txt", terms);
 			}
-			String id = methods.get(i).getID().replace(':', '_');
-			
-			corpus+= file.getAbsolutePath() + "/"+id + ".txt\n";
-			this.saveFiles(id, "txt", terms);
+		} catch (IOException | java.lang.NullPointerException e) {
+			e.printStackTrace();
 		}
-		
-		this.saveFiles("corpus", "txt", corpus);
+//		this.saveFiles("corpus", "txt", corpus);
 	}
 
 	private void init() {
@@ -164,7 +165,9 @@ public class C3 extends Metric{
 			
 			
 			File newFile = new File(file.getPath()+ "/" + methodID + "." + extension);
-			if(!newFile.exists()) newFile.createNewFile();
+			if(!newFile.exists()) {
+				newFile.createNewFile();
+			}
 			else{
 				newFile.delete();
 				newFile.createNewFile();
@@ -189,7 +192,7 @@ public class C3 extends Metric{
 		this.file.delete();
 	}
 
-	private BufferedReader getIdentifierFromParameters(int i) {
+	private BufferedReader getIdentifierFromParameters(int i)  throws java.lang.NullPointerException{
 		
 		String words = "";
 		for(MyParameter param: methods.get(i).getParameters()){
@@ -202,13 +205,23 @@ public class C3 extends Metric{
 		return new BufferedReader(new StringReader(words));
 	}
 
-	private BufferedReader getIdentifierFromMethodBody(int i) {
+	private BufferedReader getIdentifierFromMethodBody(int i)  throws java.lang.NullPointerException{
 		
 		wordsForBody = "";
 		methods.get(i).getMd().getBody().accept(new ASTVisitor(){
 			
-			public boolean visit(VariableDeclarationFragment  var){
-				SimpleName name = var.getName();
+//			public boolean visit(VariableDeclarationFragment  var){
+//				SimpleName name = var.getName();
+//				String rawName = name.getIdentifier();
+//				ArrayList<String> tokenizedName = Tokenizer.tokenize(rawName);
+//				for(String token: tokenizedName){
+//					wordsForBody += token + " \n";
+//				}
+//				
+//				return true;
+//			}
+			
+			public boolean visit(SimpleName name){
 				String rawName = name.getIdentifier();
 				ArrayList<String> tokenizedName = Tokenizer.tokenize(rawName);
 				for(String token: tokenizedName){
@@ -222,7 +235,7 @@ public class C3 extends Metric{
 		return new BufferedReader(new StringReader(wordsForBody));
 	}
 
-	private BufferedReader getIdentifierFromMethodName(int i) 
+	private BufferedReader getIdentifierFromMethodName(int i) throws java.lang.NullPointerException
 	{
 		
 		ArrayList<String> tokenizedMethodName = 

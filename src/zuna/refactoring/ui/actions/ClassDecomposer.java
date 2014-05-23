@@ -1,7 +1,5 @@
 package zuna.refactoring.ui.actions;
 
-import java.util.ArrayList;
-
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.IAdaptable;
 import org.eclipse.jface.action.IAction;
@@ -11,8 +9,9 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.IWorkbenchWindowActionDelegate;
 import org.eclipse.ui.PlatformUI;
 
-import zuna.metric.classDS.InformationContents4System;
-import zuna.metric.cohesion.c3.C3;
+import zuna.metric.cohesion.C3;
+import zuna.metric.cohesion.FCM_Distance;
+import zuna.metric.cohesion.LSCC;
 import zuna.refactoring.ProjectAnalyzer;
 import zuna.refactoring.operator.MutationClassIdentifier;
 
@@ -50,20 +49,31 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
         		init();
 	            IProject project = (IProject)((IAdaptable)firstElement).getAdapter(IProject.class);
 	            ProjectAnalyzer.firstElement = (IAdaptable)firstElement;
-	            
 	            ProjectAnalyzer.analyze(project);
-	            InformationContents4System icCalcul = new InformationContents4System();
-	            icCalcul.calculateIC();
+//	            C3 c3 = new C3(ProjectAnalyzer.project);
+//	            MyClass c = ProjectAnalyzer.project.getClass("org.jhotdraw.draw.RestoreDataEdit");
+//	            
+//	            System.out.println(c.getID()+ ":" + c3.getMetric(c));
+//	            ArrayList<MyMethod> methods = c.getOwnedMethods();
+//	            for(int i = 0 ; i < methods.size()-1; i++){
+//	            	for(int j = i+1 ; j < methods.size(); j++){
+//	            		MyMethod m1 = methods.get(i);
+//	            		MyMethod m2 = methods.get(j);
+//	            		System.out.println(m1.getID() + ":" + m2.getID() + ":" + c3.getMetric(m1, m2));
+//	            	}
+//	            }
 	            
-	            
-	            ArrayList<String> cc = new ArrayList<String>();
-	            cc.add("org.jhotdraw.draw.AbstractConnector");
-	            cc.add("org.jhotdraw.geom.Geom");
+//	            ArrayList<String> cc = new ArrayList<String>();
+//	            cc.add("org.jhotdraw.draw.AbstractConnector");
+//	            cc.add("org.jhotdraw.geom.Geom");
 	            
 	            MutationClassIdentifier mutation = new MutationClassIdentifier();
-	            mutation.prepareExperiment(cc);
+	            mutation.prepareExperiment();
+
 //	            mutation.doExperiment(new FCM_Distance(ProjectAnalyzer.project));
-	            mutation.doExperiment(new C3(ProjectAnalyzer.project));
+	            mutation.doExperiment(new LSCC(ProjectAnalyzer.project));
+//	            mutation.doExperiment(new C3(ProjectAnalyzer.project));
+//	            mutation.doExperiment(new IDCC(ProjectAnalyzer.project));
 	            
 //	            for(String key: ProjectAnalyzer.project.getClassList().keySet()){
 //	            	MyClass c= ProjectAnalyzer.project.getClassList().get(key);

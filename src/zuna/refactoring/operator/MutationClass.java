@@ -69,7 +69,7 @@ public class MutationClass {
 			}
 			
 			mutationClass = (MyClass)c2.clone();
-			mutationClass.setID(KeyMaker.getKey(c1, c2));
+			mutationClass.setID(KeyMaker.getKeyInMutation(c1, c2));
 			ArrayList<MyMethod> methodsOfc1 = c1.getOwnedMethods();
 			ArrayList<MyField> fieldsOfc1 = c1.getOwendField();
 			mutationClass.getOwnedMethods().addAll(methodsOfc1);
