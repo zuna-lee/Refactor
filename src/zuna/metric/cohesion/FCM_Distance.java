@@ -18,7 +18,7 @@ public class FCM_Distance extends Metric{
 	@Override
 	public double getMetric(MyClass c) {
 		this.initDS();
-		ArrayList<MyMethod> methods = new ArrayList<MyMethod>();
+		ArrayList<MyMethod> methods = c.getOwnedMethods();
 		double cohesion = 0.0;
 		double cnt = 0.0;
 		
@@ -28,7 +28,13 @@ public class FCM_Distance extends Metric{
 				
 				ArrayList<MyMethod> fanout1 = methods.get(i).getFanOut();
 				ArrayList<MyMethod> fanout2 = methods.get(j).getFanOut();
-				cohesion = getSimilarity(fanout1, fanout2);
+				if(fanout1.size()==0 || fanout2.size()==0){
+					cohesion += 0;
+				}else{
+					double similarity = getSimilarity(fanout1, fanout2);
+					cohesion += similarity;
+				}
+				
 			}
 		}
 		
@@ -44,9 +50,25 @@ public class FCM_Distance extends Metric{
 		double cnt = 0;
 		for(MyMethod out1: fanout1){
 			for(MyMethod out2: fanout2){
-				String key = KeyMaker.getKey(out1.getParent(), out2.getParent());
-				similarity += ArchitectureBasedDS.dsTable.get(key);
-				cnt+=1.0;
+				String key = "";
+				try{
+					if(!out1.isLibrary() && !out2.isLibrary()){
+						
+						if(out1.getParent().getID().equals(out2.getParent().getID())){
+							similarity+=1;
+						}else{
+							key = KeyMaker.getKey(out1.getParent(), out2.getParent());
+							double ds = ArchitectureBasedDS.dsTable.get(key);
+							similarity += ds;
+						}
+						
+						cnt+=1.0;
+					}
+					
+				}catch(java.lang.NullPointerException e){
+					System.out.println(key);
+				}
+				
 			}
 		}
 		if(cnt>0){
@@ -54,7 +76,6 @@ public class FCM_Distance extends Metric{
 		}else{
 			return 0;
 		}
-		
 	}
 	
 	private void initDS(){

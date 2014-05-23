@@ -11,7 +11,8 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.IWorkbenchWindowActionDelegate;
 import org.eclipse.ui.PlatformUI;
 
-import zuna.metric.cohesion.FCM_Distance;
+import zuna.metric.classDS.InformationContents4System;
+import zuna.metric.cohesion.c3.C3;
 import zuna.refactoring.ProjectAnalyzer;
 import zuna.refactoring.operator.MutationClassIdentifier;
 
@@ -51,6 +52,8 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	            ProjectAnalyzer.firstElement = (IAdaptable)firstElement;
 	            
 	            ProjectAnalyzer.analyze(project);
+	            InformationContents4System icCalcul = new InformationContents4System();
+	            icCalcul.calculateIC();
 	            
 	            
 	            ArrayList<String> cc = new ArrayList<String>();
@@ -59,7 +62,8 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	            
 	            MutationClassIdentifier mutation = new MutationClassIdentifier();
 	            mutation.prepareExperiment(cc);
-	            mutation.doExperiment(new FCM_Distance(ProjectAnalyzer.project));
+//	            mutation.doExperiment(new FCM_Distance(ProjectAnalyzer.project));
+	            mutation.doExperiment(new C3(ProjectAnalyzer.project));
 	            
 //	            for(String key: ProjectAnalyzer.project.getClassList().keySet()){
 //	            	MyClass c= ProjectAnalyzer.project.getClassList().get(key);

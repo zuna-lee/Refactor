@@ -19,14 +19,11 @@ public class MutationClassIdentifier {
 	
 	public void prepareExperiment(ArrayList<String> cohesiveClassList){
 		this.buildCCList(cohesiveClassList);
-		this.print();
 		this.buildMCList();
 		this.remove();
-		this.print();
 		this.mergeLists();
 	}
 	
-
 	private void buildCCList(ArrayList<String> cohesiveClassList){
 		for(String cohesiveClass: cohesiveClassList){
 			MyClass c = ProjectAnalyzer.project.getClass(cohesiveClass);
@@ -48,41 +45,62 @@ public class MutationClassIdentifier {
 		}
 	}
 	
-	private void changePointerTo(MyClass mutationClass, MyClass original){
+	private void remove(){
 		
 		for(String key: this.removeList.keySet()){
-			MyClass c = ProjectAnalyzer.project.getClass(key);
-			for(MyClass in : c.getUsedClasses()){
-				if(in.getID().equals(original.getID())){
-					c.getUsedClasses().remove(in);
-					c.addUsedClasses(mutationClass);
-					break;
-				}
-			}
-			
-			for(MyClass out : c.getUseClasses()){
-				if(out.getID().equals(original.getID())){
-					c.getUseClasses().remove(out);
-					c.addUsesClasses(mutationClass);
-					break;
-				}
-			}
+			ProjectAnalyzer.project.getClassList().remove(key);
+			this.cohesiveClassList.remove(key);
+		}
+		
+		for(String key: this.mutationClassList.keySet()){
+			MyClass mc = this.mutationClassList.get(key);
+			adjustPointerOfCallerClass(mc);
+			adjustPointerOfCallerMethods(mc);
+			ProjectAnalyzer.project.getClassList().put(mc.getID(), mc);
+		}
+		
+	}
 
-			for(MyMethod m : c.getOwnedMethods()){
-				ArrayList<MyMethod> fanin = m.getFanIn();
-				for(int i = 0 ; i < fanin.size() ; i++){
-					MyMethod in = fanin.get(i);
-					if(in.getParent().getID().equals(original)){
-						
-					}
+
+	private void adjustPointerOfCallerClass(MyClass mc) {
+		HashSet<MyClass> callerClasses = mc.getUsedClasses();
+		String[] cohesiveClassID = mc.getID().split(":");
+		
+		for(MyClass callerClass: callerClasses){
+			HashSet<MyClass> usesClassesOfCallerClass = callerClass.getUseClasses();
+			for(String remove: cohesiveClassID){
+				MyClass removeClass = this.removeList.get(remove);
+				if(usesClassesOfCallerClass.contains(removeClass)){
+					usesClassesOfCallerClass.remove(removeClass);
+					usesClassesOfCallerClass.add(mc);
 				}
 			}
 		}
 	}
 	
-	private void remove(){
-		for(String key: this.removeList.keySet()){
-			this.cohesiveClassList.remove(key);
+	private void adjustPointerOfCallerMethods(MyClass mc){
+		ArrayList<MyMethod> methods = mc.getOwnedMethods();
+		String[] cohesiveClassID = mc.getID().split(":");
+		
+		for(MyMethod m: methods){
+			ArrayList<MyMethod> fanin = m.getFanIn();
+			for(MyMethod in : fanin){
+				ArrayList<MyMethod> fanout = in.getFanOut();
+				ArrayList<Integer> idx = new ArrayList<Integer>();
+				for(int i = 0 ; i < fanout.size() ; i++){
+					for(String remove: cohesiveClassID){
+						if(fanout.get(i).getParent().getID().equals(remove)){
+							idx.add(i);
+						}
+					}	
+				}
+				
+				for(int id: idx){
+					fanout.remove(id);
+					fanout.add(m);
+				}
+				
+			}
 		}
 	}
 	
@@ -122,9 +140,10 @@ public class MutationClassIdentifier {
 		for(String key: classList.keySet()){
 			MyClass c = classList.get(key);
 			double v = metric.getMetric(c);
+			System.out.println(c.getID() + ":" + v);
 		}
 	}
-	
+
 	public void doExperiment(Metric metric, Metric metric2){
 		
 	}
@@ -156,10 +175,29 @@ public class MutationClassIdentifier {
 					 + ":" + c.getOwnedMethods().size()
 					 + ":" + c.getOwendField().size());
 			
-			for(MyMethod m: c.getOwnedMethods()){
-				System.out.println("                " + m.getID() + ":" + m.getFanIn().size() + ":" + m.getFanOut().size());
+			ArrayList<MyMethod> methods = c.getOwnedMethods();
+			for(MyMethod m: methods){
+				ArrayList<MyMethod> fanins = m.getFanIn();
+				for(MyMethod in: fanins){
+					ArrayList<MyMethod> fanouts = in.getFanOut();
+					int cnt = 0;
+					for(MyMethod out: fanouts){
+						System.out.println("                 " + out.getParent().getID());
+						
+					}
+					if(cnt==0){
+						System.out.println(in.getID());
+					}
+					System.out.println();
+				}
 			}
 			
+//			for(MyClass used: c.getUsedClasses()){
+//				HashSet<MyClass> uses = used.getUseClasses();
+//				for(MyClass use: uses){
+//					System.out.println("                " + used.getID() + "     :     " + use.getID());
+//				}
+//			}
 		}
 	}
 }

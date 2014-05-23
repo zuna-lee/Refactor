@@ -61,6 +61,13 @@ public class MutationClass {
 		
 		try {
 			
+			c1.getParent().getClassChildren().remove(c1.getID());
+			
+			if(c1.getParent().getClassChildren().size()==0 && c1.getParent().getPackageChildren().size()==0){
+				ProjectAnalyzer.project.getPackageList().get(c1.getParent().getID()).getPackageChildren().remove(c1.getParent().getID());
+				ProjectAnalyzer.project.getPackageList().remove(c1.getParent().getID());
+			}
+			
 			mutationClass = (MyClass)c2.clone();
 			mutationClass.setID(KeyMaker.getKey(c1, c2));
 			ArrayList<MyMethod> methodsOfc1 = c1.getOwnedMethods();

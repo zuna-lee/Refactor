@@ -15,6 +15,7 @@ public class ArchitectureBasedDS extends ICBasedDS{
 	public ArchitectureBasedDS(){
 		dsTable.clear();
 		this.getTable();
+		System.out.println("Architecture Based DS Table..." + ":" + dsTable.size());
 	}
 	
 	private double getDistance(MyClass c1, MyClass c2){
@@ -24,8 +25,8 @@ public class ArchitectureBasedDS extends ICBasedDS{
 		super.getParents(c1, parents4M1);
 		super.getParents(c2, parents4M2);
 		
-		
 		Element so = super.getSubOrdinate(parents4M1, parents4M2);
+		
 		if(so==null || so.getID().equals("ROOT")) return 0.0;
 		else return so.getIc();
 	}
@@ -66,8 +67,10 @@ public class ArchitectureBasedDS extends ICBasedDS{
 					MyClass c2 = ProjectAnalyzer.project.getClass(key2);
 					
 					if(c1!=null && c2!=null// & !c1.isInterface() && !c2.isInterface()
-							&& !dsTable.containsKey(KeyMaker.getKey(c1, c2))){
+							&& !dsTable.containsKey(KeyMaker.getKey(c1, c2))
+							&& !c1.isLibrary() && !c2.isLibrary()){
 						double ds = this.getDistance(c1, c2);
+						
 						ArchitectureBasedDS.dsTable.put(KeyMaker.getKey(c1, c2), ds);
 						ArchitectureBasedDS.dsTable.put(KeyMaker.getKey(c2, c1), ds);
 						data.add(ds);
