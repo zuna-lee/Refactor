@@ -1,22 +1,21 @@
 package zuna.model;
 
-import java.io.Serializable;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.EnumDeclaration;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 
-public class MyClass extends Element implements Cloneable, Serializable{
+public class MyClass extends Element implements Cloneable{
 	
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = -8195160897380045654L;
 	private MyPackage parent;
-	private String name;
+	private HashSet<MyClass> associatedClasses = new HashSet<MyClass>();
+	private HashSet<MyClass> associatedLibClasses = new HashSet<MyClass>();
+	private HashSet<MyClass> usesClasses = new HashSet<MyClass>();
+	private HashSet<MyClass> usedClasses = new HashSet<MyClass>();
 	private TypeDeclaration declaration;
 	private CompilationUnit cu;
 	private ArrayList<MyMethod> ownedMethods = new ArrayList<MyMethod>();
@@ -34,12 +33,6 @@ public class MyClass extends Element implements Cloneable, Serializable{
 	private ArrayList<MyClass> childClasses = new ArrayList<MyClass>();
 	private ArrayList<MyClass> implementedClasses = new ArrayList<MyClass>();
 	private ArrayList<MyClass> interfaces = new ArrayList<MyClass>();
-	
-	
-	
-	public String getName() {
-		return name;
-	}
 
 	public double getNoOfCalls() {
 		return noOfCalls;
@@ -59,7 +52,7 @@ public class MyClass extends Element implements Cloneable, Serializable{
 
 	public MyClass(String fullName, TypeDeclaration declaration, CompilationUnit cu, MyPackage parent) {
 		super( fullName, parent.isLibrary());
-		this.name = declaration.getName().getIdentifier();
+		
 		this.cu = cu;
 		this.declaration = declaration;
 		isAbstract = declaration.isInterface() || Modifier.isAbstract(declaration.getModifiers());		
@@ -71,8 +64,6 @@ public class MyClass extends Element implements Cloneable, Serializable{
 	
 	public MyClass(String fullName, boolean lib) {
 		super(fullName, lib);
-		String[] token = fullName.split("\\.");
-		this.name = token[token.length-1];
 	}
 	
 	public ArrayList<MyClass> getChildClasses() {
@@ -84,6 +75,8 @@ public class MyClass extends Element implements Cloneable, Serializable{
 		MyClass clone = (MyClass) super.clone();
 		clone.ownedMethods = (ArrayList<MyMethod>) ownedMethods.clone();
 		clone.owendField = (ArrayList<MyField>) owendField.clone();
+		clone.usedClasses = (HashSet<MyClass>) usedClasses.clone();
+		clone.usesClasses = (HashSet<MyClass>) usesClasses.clone();
 		
 		return clone;
 	}
@@ -157,8 +150,6 @@ public class MyClass extends Element implements Cloneable, Serializable{
 	public MyClass(String fullName, MyPackage parent) {
 		super( fullName, parent.isLibrary());
 		this.setParent(parent);
-		String[] token = fullName.split("\\.");
-		this.name = token[token.length-1];
 	}
 	
 	
@@ -212,7 +203,6 @@ public class MyClass extends Element implements Cloneable, Serializable{
 		super(bindingClass.getQualifiedName(), parent.isLibrary());
 		isAbstract = bindingClass.isInterface() || Modifier.isAbstract(bindingClass.getModifiers());		
 		isInterface = declaration.isInterface();
-		
 		this.setParent(parent);
 	}
 
@@ -251,6 +241,21 @@ public class MyClass extends Element implements Cloneable, Serializable{
 		}
 	}
 
+	public HashSet<MyClass> getAssociatedClasses() {
+		return associatedClasses;
+	}
+
+	public void addAssociatedClasses(MyClass associatedClass) {
+		this.associatedClasses.add(associatedClass);
+	}
+
+	public HashSet<MyClass> getAssociatedLibClasses() {
+		return associatedLibClasses;
+	}
+
+	public void addAssociatedLibClasses(MyClass libClass) {
+		this.associatedLibClasses.add(libClass);
+	}
 
 	public ArrayList<MyMethod> getOwnedMethods() {
 		return ownedMethods;
@@ -277,6 +282,28 @@ public class MyClass extends Element implements Cloneable, Serializable{
 		}
 	}
 
+	public int getCBO() {
+		return associatedClasses.size();
+	}
+
+	public HashSet<MyClass> getUseClasses() {
+		// TODO Auto-generated method stub
+		return usesClasses;
+	}
+
+	public HashSet<MyClass> getUsedClasses() {
+		// TODO Auto-generated method stub
+		return usedClasses;
+	}
+	
+	public void addUsedClasses(MyClass c) {
+		this.usedClasses.add(c);
+	}
+	
+	public void addUsesClasses(MyClass c) {
+		this.usesClasses.add(c);
+	}
+	
 	
 
 }
