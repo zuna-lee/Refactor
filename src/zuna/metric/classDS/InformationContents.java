@@ -36,7 +36,6 @@ public class InformationContents {
 		for(String key: ProjectAnalyzer.project.getPackageList().keySet()){
 			InformationContents.se=0;
 			double se = this.getNoOfSubEntities(ProjectAnalyzer.project.getPackageList().get(key));
-			
 			ProjectAnalyzer.project.getPackageList().get(key).setIc(-Math.log( se / this.totEntities));
 			ProjectAnalyzer.project.getPackageList().get(key).setSe(se);
 		}

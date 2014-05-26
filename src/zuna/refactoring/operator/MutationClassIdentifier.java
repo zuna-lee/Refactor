@@ -14,7 +14,7 @@ import zuna.model.MyMethod;
 import zuna.refactoring.ProjectAnalyzer;
 import zuna.util.Logger2File;
 
-public class MutationClassIdentifier {
+public class MutationClassIdentifier implements Experimentor{
 
 	Hashtable<String, MyClass> cohesiveClassList = new Hashtable<String, MyClass>();
 	Hashtable<String, MyClass> classList = new Hashtable<String, MyClass>();
@@ -35,8 +35,7 @@ public class MutationClassIdentifier {
 		for(String key: classList.keySet()){
 			MyClass c = classList.get(key);
 			
-			if(c.getOwnedMethods().size()<10 && c.getOwnedMethods().size()>=2 && c.getOwendField().size() >0
-					&& !c.isAbstract() && !c.isEnumuration() && !c.isLibrary()){
+			if(!c.isAbstract() && !c.isEnumuration() && !c.isLibrary()){
 				this.classList.put(c.getID(), c);
 			}
 		}
@@ -174,7 +173,8 @@ public class MutationClassIdentifier {
 		classList.putAll(this.cohesiveClassList);
 		classList.putAll(this.mutationClassList);
 	}
-	
+
+	@Override
 	public void doExperiment(Metric metric){
 		
 		if(metric instanceof FCM_Distance){
@@ -249,4 +249,5 @@ public class MutationClassIdentifier {
 //			}
 		}
 	}
+
 }

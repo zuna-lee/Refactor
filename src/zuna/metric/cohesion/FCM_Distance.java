@@ -31,9 +31,9 @@ public class FCM_Distance extends Metric{
 					cohesion += 0;
 				}else{
 					double similarity = getSimilarity(fanout1, fanout2);
+//					System.out.println(methods.get(i).getID() + " == " + methods.get(j).getID() + " == " + similarity);
 					cohesion += similarity;
 				}
-				
 			}
 		}
 		
@@ -52,7 +52,6 @@ public class FCM_Distance extends Metric{
 				String key = "";
 				try{
 					if(!out1.isLibrary() && !out2.isLibrary()){
-						
 						if(out1.getParent().getID().equals(out2.getParent().getID())){
 							similarity+=1;
 						}else{
@@ -67,7 +66,6 @@ public class FCM_Distance extends Metric{
 				}catch(java.lang.NullPointerException e){
 //					System.out.println(key);
 				}
-				
 			}
 		}
 		if(cnt>0){

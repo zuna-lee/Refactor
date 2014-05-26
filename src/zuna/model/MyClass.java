@@ -203,7 +203,6 @@ public class MyClass extends Element implements Cloneable{
 		super(bindingClass.getQualifiedName(), parent.isLibrary());
 		isAbstract = bindingClass.isInterface() || Modifier.isAbstract(bindingClass.getModifiers());		
 		isInterface = declaration.isInterface();
-		
 		this.setParent(parent);
 	}
 
