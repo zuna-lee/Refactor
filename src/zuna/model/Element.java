@@ -16,7 +16,6 @@ public abstract class Element implements Serializable{
 	private List<Modifier> modifier;
 	private double se;
 	private double ic;
-	private double test;
 	
 	public double getSe() {
 		return se;

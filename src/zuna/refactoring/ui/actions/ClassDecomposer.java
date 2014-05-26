@@ -1,7 +1,5 @@
 package zuna.refactoring.ui.actions;
 
-import java.util.HashMap;
-
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.IAdaptable;
 import org.eclipse.jdt.internal.core.CompilationUnit;
@@ -12,9 +10,9 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.IWorkbenchWindowActionDelegate;
 import org.eclipse.ui.PlatformUI;
 
-import zuna.metric.cohesion.C3;
-import zuna.model.MyClass;
 import zuna.refactoring.ProjectAnalyzer;
+import zuna.refactoring.experiment.Experiment;
+import zuna.refactoring.experiment.FaultPrediction;
 
 @SuppressWarnings("restriction")
 public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
@@ -52,17 +50,8 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	            ProjectAnalyzer.firstElement = (IAdaptable)firstElement;
 	            ProjectAnalyzer.analyze(project);
 	            
-	            System.out.println(ProjectAnalyzer.project.getClassList().size());
-	            System.out.println(ProjectAnalyzer.project.getMethodList().size());
-	            System.out.println(ProjectAnalyzer.project.getPackageList().size());
-	            
-	            HashMap<String, MyClass> classList = ProjectAnalyzer.project.getClassList();
-	            for(String key: classList.keySet()){
-	            	MyClass c = classList.get(key);
-	            	C3 c3 = new C3(ProjectAnalyzer.project);
-	            	System.out.println(c.getID() + ":" +  c3.getMetric(c));
-	            	break;
-	            }
+	            Experiment experiment = new FaultPrediction(ProjectAnalyzer.project);
+	            experiment.prepareExperiment();
 	            
 			}catch(java.lang.NullPointerException e){
 				e.printStackTrace();

@@ -2,7 +2,6 @@ package zuna.refactoring;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.Hashtable;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
@@ -23,7 +22,6 @@ import zuna.model.Repo;
 
 public class ProjectAnalyzer{
 	public static IProject iproject;
-	public static Hashtable<String, Metric> metrics = new Hashtable<String, Metric>();
 	public static Repo project;
 	public static String prjName;
 	public static Repo mutatedProject;
