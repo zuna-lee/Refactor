@@ -11,12 +11,10 @@ import zuna.model.Repo;
 
 
 public class CC extends Metric{
-
 	private IAS ias = new IAS();
 	
 	public CC(Repo p) {
 		super(p);
-		// TODO Auto-generated constructor stub
 	}
 
 	@Override
@@ -40,5 +38,4 @@ public class CC extends Metric{
 		if(allPair==0) return 0;
 		else return similarity/allPair;
 	}
-
 }

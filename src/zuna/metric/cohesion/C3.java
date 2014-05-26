@@ -9,11 +9,11 @@ import java.util.Properties;
 import java.util.Vector;
 
 import tml.Configuration;
+import tml.DbConnection;
 import tml.corpus.Corpus;
 import tml.corpus.CorpusParameters.DimensionalityReduction;
 import tml.corpus.CorpusParameters.TermSelection;
 import tml.corpus.RepositoryCorpus;
-import tml.sql.DbConnection;
 import tml.storage.Repository;
 import tml.vectorspace.TermWeighting.GlobalWeight;
 import tml.vectorspace.TermWeighting.LocalWeight;
@@ -60,7 +60,6 @@ public class C3 extends Metric{
 	public double getMetric(MyClass c) {
 		double values = 0.0;
 		try {
-			
 				Repository.cleanStorage(Configuration.getTmlFolder() + "/test/lucene");
 				repository = new Repository(Configuration.getTmlFolder() + "/test/lucene");
 				repository.addMethods(c);

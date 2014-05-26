@@ -29,8 +29,6 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 
-import tml.sql.DbConnection;
-
 /**
  * This class implements the configuration for TML, it reads a default config file from the jar.
  * It contains the settings for log4j, stopwords and language to use.

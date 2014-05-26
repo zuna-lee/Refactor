@@ -1,6 +1,5 @@
 package zuna.refactoring.ui.actions;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.eclipse.core.resources.IProject;
@@ -13,9 +12,9 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.IWorkbenchWindowActionDelegate;
 import org.eclipse.ui.PlatformUI;
 
+import zuna.metric.cohesion.C3;
 import zuna.model.MyClass;
 import zuna.refactoring.ProjectAnalyzer;
-import zuna.util.Logger2File;
 
 @SuppressWarnings("restriction")
 public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
@@ -58,33 +57,12 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	            System.out.println(ProjectAnalyzer.project.getPackageList().size());
 	            
 	            HashMap<String, MyClass> classList = ProjectAnalyzer.project.getClassList();
-	            int cnt = 0;
-	            int tot = 0;
-	            ArrayList<String> info = new ArrayList<String>();
-	            
 	            for(String key: classList.keySet()){
 	            	MyClass c = classList.get(key);
-	            	
-	            	String id =c.getID();
-	            	String fsize = String.valueOf(c.getOwendField().size());
-	            	String msize = String.valueOf(c.getOwnedMethods().size());
-	            	String intf = String.valueOf(c.isInterface());
-	            	String abstrct = String.valueOf(c.isAbstract());
-	            	String enm = String.valueOf(c.isEnumuration());
-	            	
-	            	String v = id + ":" + fsize + ":" + msize + ":" + intf + ":" + abstrct + ":" + enm;
-	            	info.add(v);
-	            	if(!c.isInterface()){
-	            		tot++;
-	            		if(c.getOwendField().size()==0){
-	            			
-	            			cnt++;
-	            		}
-	            	}
+	            	C3 c3 = new C3(ProjectAnalyzer.project);
+	            	System.out.println(c.getID() + ":" +  c3.getMetric(c));
+	            	break;
 	            }
-	            Logger2File.print2CSVFile(info, "agv034");
-	            
-	            System.out.println(cnt + ":" + tot + ":" + (double) cnt / (double) tot);
 	            
 			}catch(java.lang.NullPointerException e){
 				e.printStackTrace();
@@ -93,8 +71,6 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 			}
 		}
 	}
-
-
 
     private void init(){
 		ProjectAnalyzer.project = null;
