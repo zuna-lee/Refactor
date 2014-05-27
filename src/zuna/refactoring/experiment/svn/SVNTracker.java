@@ -12,8 +12,6 @@ import org.tmatesoft.svn.core.SVNLogEntryPath;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 
-import zuna.refactoring.ProjectAnalyzer;
-
 
 public class SVNTracker{
 
@@ -34,9 +32,9 @@ public class SVNTracker{
 	
 	public void init(){
 		if(prjName.startsWith("ArgoUML")) url = "http://argouml.tigris.org/svn/argouml/trunk";
-		else if(prjName.startsWith("JEdit")) url = "svn://svn.code.sf.net/p/jedit/svn";
+		else if(prjName.startsWith("JEdit")) url = "svn://svn.code.sf.net/p/jedit/svn/jEdit/trunk/";
 		else if(prjName.startsWith("JHotDraw")) url = "svn://svn.code.sf.net/p/jhotdraw/svn";
-		else if(prjName.startsWith("JMeter")) url = "http://svn.apache.org/repos/asf/jmeter/trunk";
+		else if(prjName.startsWith("JMeter")) url = "http://svn.apache.org/repos/asf/jmeter/trunk/";
 		else if(prjName.startsWith("Refactoring")) url = "https://163.239.200.152/svn/Refactoring/";
 		
 		if(prjName.startsWith("ArgoUML")) {
@@ -61,13 +59,14 @@ public class SVNTracker{
 		String password ="";
 		name = "zuna";
 		password = "tjrkdSELAB913";
-		
-		return tracker.connectToSVN(url, name, password);
+		boolean conn = tracker.connectToSVN(url, name, password);
+		return conn;
 	}
 
 	public void trackSVN(long startRevision, long endRevision) {
 		String[] paths = { "" };
-		if(endRevision==-1) endRevision = SVNRevision.HEAD.getNumber();
+//		if(endRevision==-1) endRevision = SVNRevision.HEAD.getNumber();
+		endRevision = 1597614;
 		boolean changedPath = true;
 		boolean strictNode = false;
 		long limit = -1;
@@ -83,19 +82,19 @@ public class SVNTracker{
 				if(this.isBugFixChange(message))
 				{
 					Vector<String> javafiles = filterJava(entry.getChangedPaths());
-		
 					if(javafiles.size()>1)
 					{
+						System.out.println(entry.getRevision() + ":" + javafiles.size());
 						logs.put(entry.getRevision(), javafiles);
 					}
 				}
-					
-					
 			}
 			
 			private boolean isBugFixChange(String message){
-				if(message.toLowerCase().contains("bug") || message.toLowerCase().contains("fix") || message.toLowerCase().contains("error")
-						 || message.toLowerCase().contains("fixes")|| message.toLowerCase().contains("findbugs")){
+				if(message.toLowerCase().contains("bug") 
+						|| message.toLowerCase().contains("bugs") || message.toLowerCase().contains("fix") 
+						|| message.toLowerCase().contains("error")
+						|| message.toLowerCase().contains("fixes")|| message.toLowerCase().contains("findbugs")){
 					return true;
 				}
 				return false;
@@ -124,8 +123,9 @@ public class SVNTracker{
 					fileName = this.getID(value.getPath());
 				}
 				
-				if(ProjectAnalyzer.project.getClassList().containsKey(fileName)) 
+//				if(ProjectAnalyzer.project.getClassList().containsKey(fileName)) {
 					result.add(fileName);
+//				}
 			}
 		}
 		

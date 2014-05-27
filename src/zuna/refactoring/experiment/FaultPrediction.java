@@ -26,12 +26,12 @@ public class FaultPrediction implements Experiment {
 		this.tracker = new SVNTracker(projectName);
 		this.tracker.init();
 		this.tracker.connectToSVN();
-		this.tracker.trackSVN(30, SVNTracker.HEAD);
+		this.tracker.trackSVN(1300000, SVNTracker.HEAD);
 		Hashtable<String, Integer> bugFiles = this.tracker.getBugFileIndex();
 		
-		for(String key: bugFiles.keySet()){
-			System.out.println(key  + ":" + bugFiles.get(key));
-		}
+//		for(String key: bugFiles.keySet()){
+//			System.out.println(key  + ":" + bugFiles.get(key));
+//		}
 	}
 
 	@Override

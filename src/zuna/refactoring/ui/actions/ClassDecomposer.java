@@ -50,8 +50,8 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	            ProjectAnalyzer.firstElement = (IAdaptable)firstElement;
 	            ProjectAnalyzer.analyze(project);
 	            
-	            Experiment experiment = new FaultPrediction(ProjectAnalyzer.project);
-	            experiment.prepareExperiment();
+//	            Experiment experiment = new FaultPrediction(project.getName());
+//	            experiment.prepareExperiment();
 	            
 			}catch(java.lang.NullPointerException e){
 				e.printStackTrace();
