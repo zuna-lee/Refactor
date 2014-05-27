@@ -14,6 +14,7 @@ import org.eclipse.ui.IWorkbenchWindowActionDelegate;
 import org.eclipse.ui.PlatformUI;
 
 import zuna.metric.classDS.ArchitectureBasedDS;
+import zuna.metric.classDS.InformationContents4System;
 import zuna.metric.cohesion.C3;
 import zuna.metric.cohesion.FCM_Distance;
 import zuna.metric.cohesion.LSCC;
@@ -57,6 +58,8 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	            IProject project = (IProject)((IAdaptable)firstElement).getAdapter(IProject.class);
 	            ProjectAnalyzer.firstElement = (IAdaptable)firstElement;
 	            ProjectAnalyzer.analyze(project);
+	            InformationContents4System icCalcul = new InformationContents4System();
+	            icCalcul.calculateIC();
 	            new ArchitectureBasedDS();
 	            
 	            HashMap<String, MyClass> classList = ProjectAnalyzer.project.getClassList();
@@ -65,12 +68,11 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	            FCM_Distance fcm = new FCM_Distance(ProjectAnalyzer.project);
             	LSCC lscc = new LSCC(ProjectAnalyzer.project);
             	C3 c3 = new C3(ProjectAnalyzer.project);
-            	CBO cbo = new CBO(ProjectAnalyzer.project);
             	
 	            for(String key: classList.keySet()){
 	            	MyClass c = classList.get(key);
 	            	metric.add(c.getID() + ":" +  c.getOwnedMethods().size() + ":" + c.getOwendField().size() + ":" +
-	            			fcm.getMetric(c) + ":" +  lscc.getMetric(c) + ":" + c3.getMetric(c) + ":" + cbo.getMetric(c));
+	            			fcm.getMetric(c) + ":" +  lscc.getMetric(c) + ":" + c3.getMetric(c));
 	            }
 	            
 	            Logger2File.print2CSVFile(metric, project.getName());
