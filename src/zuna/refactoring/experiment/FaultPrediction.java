@@ -1,6 +1,7 @@
 package zuna.refactoring.experiment;
 
 import java.util.Hashtable;
+import java.util.Vector;
 
 import zuna.metric.Metric;
 import zuna.model.Repo;
@@ -26,12 +27,19 @@ public class FaultPrediction implements Experiment {
 		this.tracker = new SVNTracker(projectName);
 		this.tracker.init();
 		this.tracker.connectToSVN();
-		this.tracker.trackSVN(1300000, SVNTracker.HEAD);
-		Hashtable<String, Integer> bugFiles = this.tracker.getBugFileIndex();
 		
-//		for(String key: bugFiles.keySet()){
-//			System.out.println(key  + ":" + bugFiles.get(key));
-//		}
+		if(this.projectName.equals("JHotDraw"))
+			this.tracker.trackSVN(300, 789);
+		else if(this.projectName.equals("JEdit"))
+			this.tracker.trackSVN(20000, 23571);
+		else if(this.projectName.equals("JMeter"))
+			this.tracker.trackSVN(1500000, 1597614);
+		
+		Hashtable<String, Vector<Long>> bugFiles = this.tracker.getBugFileIndex();
+		
+		for(String key: bugFiles.keySet()){
+			System.out.println(key  + ":" + bugFiles.get(key).get(0) + ":" + bugFiles.get(key).get(1));
+		}
 	}
 
 	@Override

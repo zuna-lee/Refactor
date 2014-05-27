@@ -10,7 +10,8 @@ import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNLogEntryPath;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
-import org.tmatesoft.svn.core.wc.SVNRevision;
+
+import zuna.refactoring.ProjectAnalyzer;
 
 
 public class SVNTracker{
@@ -46,7 +47,7 @@ public class SVNTracker{
 			path = "/trunk/jhotdraw7/src/main/java.*";
 			pathLength = path.length()-1;
 		}else if(prjName.startsWith("JMeter")) {
-			path = "/src.*";
+			path = "/jmeter/trunk/src/protocol/java.*";
 		}else if(prjName.startsWith("Refactoring")) {
 			path = "/src.*";
 		}
@@ -65,8 +66,8 @@ public class SVNTracker{
 
 	public void trackSVN(long startRevision, long endRevision) {
 		String[] paths = { "" };
-//		if(endRevision==-1) endRevision = SVNRevision.HEAD.getNumber();
-		endRevision = 1597614;
+		
+		
 		boolean changedPath = true;
 		boolean strictNode = false;
 		long limit = -1;
@@ -77,14 +78,13 @@ public class SVNTracker{
 			public void handleLogEntry(SVNLogEntry entry) throws SVNException 
 			{
 				String message = entry.getMessage();
-				
 //				System.out.println(entry.getRevision() + ": " + message);
 				if(this.isBugFixChange(message))
 				{
 					Vector<String> javafiles = filterJava(entry.getChangedPaths());
 					if(javafiles.size()>1)
 					{
-						System.out.println(entry.getRevision() + ":" + javafiles.size());
+//						System.out.println(entry.getRevision() + ":" + javafiles.size());
 						logs.put(entry.getRevision(), javafiles);
 					}
 				}
@@ -119,13 +119,15 @@ public class SVNTracker{
 					fileName = this.getIDArgoUML(value.getPath());
 				}else if (prjName.startsWith("PicketLink")){
 					fileName = this.getIDPicketLink(value.getPath());
+				}else if(prjName.startsWith("JMeter")){
+					fileName = this.getIDJMeter(value.getPath());
 				}else{
 					fileName = this.getID(value.getPath());
 				}
 				
-//				if(ProjectAnalyzer.project.getClassList().containsKey(fileName)) {
+				if(ProjectAnalyzer.project.getClassList().containsKey(fileName)) {
 					result.add(fileName);
-//				}
+				}
 			}
 		}
 		
@@ -134,7 +136,6 @@ public class SVNTracker{
 	}
 
 	private String getID(String fileName){
-		
 		String fileID=fileName;
 		fileID = fileID.substring(pathLength, fileID.length()-5);
 		fileID = fileID.replace("/", ".");
@@ -150,6 +151,15 @@ public class SVNTracker{
 		return fileID;
 	}
 
+	private String getIDJMeter(String fileName){
+		String fileID=fileName;
+		String[] token = fileName.split("/org/");
+		fileID = token[token.length-1];
+		fileID = "org/" + fileID;
+		fileID = this.getID(fileID);
+		return fileID;
+	}
+	
 	private String getIDPicketLink(String fileName){
 		String fileID=fileName;
 		String[] token = fileName.split("/src/main/java/");
@@ -160,17 +170,24 @@ public class SVNTracker{
 	
 	
 	
-	public Hashtable<String, Integer> getBugFileIndex(){
-		Hashtable<String, Integer> bugFiles = new Hashtable<String, Integer>();
+	public Hashtable<String, Vector<Long>> getBugFileIndex(){
+		Hashtable<String, Vector<Long>> bugFiles = new Hashtable<String, Vector<Long>>();
 		
 		for(Long rev :logs.keySet()){
 			Vector<String> changedFiles = logs.get(rev);
 			for(String changedFile: changedFiles){
 				if(!bugFiles.containsKey(changedFile)){
-					bugFiles.put(changedFile, 1);
+					Vector<Long> ll = new Vector<Long>();
+					ll.add(rev);
+					ll.add(1l);
+					bugFiles.put(changedFile, ll);
 				}else{
-					int count = bugFiles.get(changedFile);
-					bugFiles.put(changedFile, ++count);
+					long count = (long) bugFiles.get(changedFile).get(1);
+					Vector<Long> ll = new Vector<Long>();
+					ll.add(rev);
+					ll.add(++count);
+					bugFiles.put(changedFile, ll);
+					
 				}
 			}
 		}
