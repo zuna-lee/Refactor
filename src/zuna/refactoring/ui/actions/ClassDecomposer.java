@@ -1,5 +1,6 @@
 package zuna.refactoring.ui.actions;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.eclipse.core.resources.IProject;
@@ -12,9 +13,14 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.IWorkbenchWindowActionDelegate;
 import org.eclipse.ui.PlatformUI;
 
+import zuna.metric.classDS.ArchitectureBasedDS;
 import zuna.metric.cohesion.C3;
+import zuna.metric.cohesion.FCM_Distance;
+import zuna.metric.cohesion.LSCC;
+import zuna.metric.coupling.CBO;
 import zuna.model.MyClass;
 import zuna.refactoring.ProjectAnalyzer;
+import zuna.util.Logger2File;
 
 @SuppressWarnings("restriction")
 public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
@@ -51,18 +57,24 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	            IProject project = (IProject)((IAdaptable)firstElement).getAdapter(IProject.class);
 	            ProjectAnalyzer.firstElement = (IAdaptable)firstElement;
 	            ProjectAnalyzer.analyze(project);
-	            
-	            System.out.println(ProjectAnalyzer.project.getClassList().size());
-	            System.out.println(ProjectAnalyzer.project.getMethodList().size());
-	            System.out.println(ProjectAnalyzer.project.getPackageList().size());
+	            new ArchitectureBasedDS();
 	            
 	            HashMap<String, MyClass> classList = ProjectAnalyzer.project.getClassList();
+	            
+	            ArrayList<String> metric = new ArrayList<String>();
+	            FCM_Distance fcm = new FCM_Distance(ProjectAnalyzer.project);
+            	LSCC lscc = new LSCC(ProjectAnalyzer.project);
+            	C3 c3 = new C3(ProjectAnalyzer.project);
+            	CBO cbo = new CBO(ProjectAnalyzer.project);
+            	
 	            for(String key: classList.keySet()){
 	            	MyClass c = classList.get(key);
-	            	C3 c3 = new C3(ProjectAnalyzer.project);
-	            	System.out.println(c.getID() + ":" +  c3.getMetric(c));
-	            	break;
+	            	metric.add(c.getID() + ":" +  c.getOwnedMethods().size() + ":" + c.getOwendField().size() + ":" +
+	            			fcm.getMetric(c) + ":" +  lscc.getMetric(c) + ":" + c3.getMetric(c) + ":" + cbo.getMetric(c));
 	            }
+	            
+	            Logger2File.print2CSVFile(metric, project.getName());
+	            
 	            
 			}catch(java.lang.NullPointerException e){
 				e.printStackTrace();
