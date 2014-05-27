@@ -1,6 +1,8 @@
 package zuna.metric.classDS;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 
 import zuna.model.Element;
@@ -11,10 +13,13 @@ import zuna.util.KeyMaker;
 public class ArchitectureBasedDS extends ICBasedDS{
 
 	public static Hashtable<String, Double> dsTable = new Hashtable<String, Double>();
+	public static Hashtable<String, Double> dfTable = new Hashtable<String, Double>();
 	
 	public ArchitectureBasedDS(){
 		dsTable.clear();
-		this.getTable();
+		this.getDSTable();
+		this.getDFTable();
+		
 		System.out.println("Architecture Based DS Table..." + ":" + dsTable.size());
 	}
 	
@@ -55,7 +60,30 @@ public class ArchitectureBasedDS extends ICBasedDS{
 		return cnt;
 	}
 	
-	private void getTable(){
+	private void getDFTable(){
+		HashMap<String, MyClass> classes = ProjectAnalyzer.project.getClassList();
+		
+		for(String key: classes.keySet()){
+			MyClass c = classes.get(key);
+			dfTable.put(c.getID(), 0d);
+			for(String key2: classes.keySet()){
+				if(!key.equals(key2)){
+					MyClass ext = classes.get(key);
+					HashSet<MyClass> useClasses = ext.getUseClasses();
+					for(MyClass use: useClasses){
+						if(use.getID().equals(c.getID())){
+							double count = dfTable.get(c.getID());
+							dfTable.put(c.getID(), ++count);
+							break;
+						}
+					}
+				}
+			}
+			
+		}
+	}
+	
+	private void getDSTable(){
 		int cnt = 0;
 		ArrayList<Double> data = new ArrayList<Double>();
 		double sum = 0;

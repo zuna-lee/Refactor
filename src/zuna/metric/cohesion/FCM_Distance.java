@@ -31,7 +31,6 @@ public class FCM_Distance extends Metric{
 					cohesion += 0;
 				}else{
 					double similarity = getSimilarity(fanout1, fanout2);
-//					System.out.println(methods.get(i).getID() + " == " + methods.get(j).getID() + " == " + similarity);
 					cohesion += similarity;
 				}
 			}
@@ -57,6 +56,7 @@ public class FCM_Distance extends Metric{
 						}else{
 							key = KeyMaker.getKey(out1.getParent(), out2.getParent());
 							double ds = ArchitectureBasedDS.dsTable.get(key);
+							
 							similarity += ds;
 						}
 						
