@@ -62,20 +62,24 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	            icCalcul.calculateIC();
 	            new ArchitectureBasedDS();
 	            
-//	            HashMap<String, MyClass> classList = ProjectAnalyzer.project.getClassList();
-//	            
-//	            ArrayList<String> metric = new ArrayList<String>();
+	            HashMap<String, MyClass> classList = ProjectAnalyzer.project.getClassList();
+	            
+	            ArrayList<String> metric = new ArrayList<String>();
 //	            FCM_Distance fcm = new FCM_Distance(ProjectAnalyzer.project);
 //            	LSCC lscc = new LSCC(ProjectAnalyzer.project);
 //            	C3 c3 = new C3(ProjectAnalyzer.project);
-//            	
-//	            for(String key: classList.keySet()){
-//	            	MyClass c = classList.get(key);
-//	            	metric.add(c.getID() + ":" +  c.getOwnedMethods().size() + ":" + c.getOwendField().size() + ":" +
-//	            			fcm.getMetric(c) + ":" +  lscc.getMetric(c) + ":" + c3.getMetric(c));
-//	            }
-//	            
-//	            Logger2File.print2CSVFile(metric, project.getName());
+            	CBO cbo = new CBO(ProjectAnalyzer.project);
+	            for(String key: classList.keySet()){
+	            	MyClass c = classList.get(key);
+	            	if(!c.isLibrary()){
+	            		metric.add(c.getID() + ":" +  c.getOwnedMethods().size() + ":" + c.getOwendField().size() + ":" +
+	            				cbo.getMetric(c));
+		            	//+ ":" +  lscc.getMetric(c) + ":" + c3.getMetric(c));
+	            	}
+	            	
+	            }
+	            
+	            Logger2File.print2CSVFile(metric, project.getName());
 	            
 	            
 			}catch(java.lang.NullPointerException e){

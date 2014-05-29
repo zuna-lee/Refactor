@@ -155,6 +155,7 @@ public class EntityAnalyzerProgress implements IRunnableWithProgress{
 			for (MyMethod fanOutMethod : md.getFanOut()) {
 				if(fanOutMethod != null) {
 					fanOutMethod.addFanInMethod(md);
+					fanOutMethod.getParent().addUsedClasses(md.getParent());
 				}
 			}
 		}

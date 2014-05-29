@@ -7,6 +7,7 @@ import zuna.metric.classDS.ArchitectureBasedDS;
 import zuna.model.MyClass;
 import zuna.model.MyMethod;
 import zuna.model.Repo;
+import zuna.refactoring.ProjectAnalyzer;
 import zuna.util.KeyMaker;
 
 public class FCM_Distance extends Metric{
@@ -56,8 +57,8 @@ public class FCM_Distance extends Metric{
 						}else{
 							key = KeyMaker.getKey(out1.getParent(), out2.getParent());
 							double ds = ArchitectureBasedDS.dsTable.get(key);
-							
-							similarity += ds;
+							double e = this.weightingFactor(out1.getParent(), out2.getParent());
+							similarity += ds * e;
 						}
 						
 						cnt+=1.0;
@@ -75,5 +76,28 @@ public class FCM_Distance extends Metric{
 		}
 	}
 	
+	
+	private double weightingFactor(MyClass c1, MyClass c2){
+		Double e = 0.0, e1 = 0.0;
+		
+		
+		
+		e = (double)1/(double)ArchitectureBasedDS.dfTable.get(c1.getID());
+		e1 = (double)1/(double)ArchitectureBasedDS.dfTable.get(c2.getID());
+		
+		if(e.isNaN() || e.isInfinite()){
+			e = 0d;
+		}
+		
+		if(e1.isNaN() || e1.isInfinite()){
+			e1 = 0d;
+		}
+		
+		if(e>e1){
+			return e1;
+		}else{
+			return e;
+		}
+	}
 
 }

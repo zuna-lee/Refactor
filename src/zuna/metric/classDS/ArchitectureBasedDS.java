@@ -20,7 +20,8 @@ public class ArchitectureBasedDS extends ICBasedDS{
 		this.getDSTable();
 		this.getDFTable();
 		
-		System.out.println("Architecture Based DS Table..." + ":" + dsTable.size());
+
+		
 	}
 	
 	private double getDistance(MyClass c1, MyClass c2){
@@ -65,23 +66,35 @@ public class ArchitectureBasedDS extends ICBasedDS{
 		
 		for(String key: classes.keySet()){
 			MyClass c = classes.get(key);
-			dfTable.put(c.getID(), 0d);
-			for(String key2: classes.keySet()){
-				if(!key.equals(key2)){
-					MyClass ext = classes.get(key);
-					HashSet<MyClass> useClasses = ext.getUseClasses();
-					for(MyClass use: useClasses){
-						if(use.getID().equals(c.getID())){
-							double count = dfTable.get(c.getID());
-							dfTable.put(c.getID(), ++count);
-							break;
-						}
-					}
-				}
+			if(!c.isLibrary()){
+				dfTable.put(c.getID(), (double)(c.getUsedClasses().size()));
 			}
 			
 		}
 	}
+	
+//	private void getDFTable(){
+//		HashMap<String, MyClass> classes = ProjectAnalyzer.project.getClassList();
+//		
+//		for(String key: classes.keySet()){
+//			MyClass c = classes.get(key);
+//			dfTable.put(c.getID(), 0d);
+//			for(String key2: classes.keySet()){
+//				if(!key.equals(key2)){
+//					MyClass ext = classes.get(key);
+//					HashSet<MyClass> useClasses = ext.getUseClasses();
+//					for(MyClass use: useClasses){
+//						if(use.getID().equals(c.getID())){
+//							double count = dfTable.get(c.getID());
+//							dfTable.put(c.getID(), ++count);
+//							break;
+//						}
+//					}
+//				}
+//			}
+//			
+//		}
+//	}
 	
 	private void getDSTable(){
 		int cnt = 0;
