@@ -24,13 +24,13 @@ import zuna.refactoring.ProjectAnalyzer;
 import zuna.util.Logger2File;
 
 @SuppressWarnings("restriction")
-public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
+public class Harmony implements IWorkbenchWindowActionDelegate {
 	private static IWorkbenchWindow window;
 	public static double th=21;
 	/**
 	 * The constructor.
 	 */
-	public ClassDecomposer() {
+	public Harmony() {
 		
 	}
 
