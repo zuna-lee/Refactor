@@ -16,7 +16,7 @@
             </separator>
          </menu>
          <action
-               class="zuna.refactoring.ui.actions.ClassDecomposer"
+               class="zuna.refactoring.ui.actions.Harmony"
                icon="icons/sample.gif"
                id="Refactoring.action1"
                label="&amp;ClassDecomposer"
