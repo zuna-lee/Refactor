@@ -2,13 +2,14 @@ package zuna.metric.cohesion;
 
 import java.util.ArrayList;
 
+import zuna.metric.LLDMetric;
 import zuna.metric.Metric;
 import zuna.model.MyClass;
 import zuna.model.MyField;
 import zuna.model.MyMethod;
 import zuna.model.Repo;
 
-public class LSCC extends Metric{
+public class LSCC extends Metric implements LLDMetric{
 
 	private ArrayList<MyField> fields = new ArrayList<MyField>();
 	
@@ -85,8 +86,12 @@ public class LSCC extends Metric{
 		correlated+=this.getNoOfCoReferredField(referredField1, referredField2);
 //		correlated+=this.getNoOfCoReferredField(notReferredField1, notReferredField2);
 		
-		if((double)this.fields.size()==0) return 0.0;
-		else return correlated/(double)this.fields.size();
+		if((double)this.fields.size()==0) {
+			return 0.0;
+		}
+		else {
+			return correlated/(double)this.fields.size();
+		}
 	}
 
 }

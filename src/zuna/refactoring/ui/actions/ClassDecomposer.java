@@ -11,18 +11,16 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.IWorkbenchWindowActionDelegate;
 import org.eclipse.ui.PlatformUI;
 
+import zuna.clustering.HAC.HierarchicalClustering;
 import zuna.metric.classDS.ArchitectureBasedDS;
 import zuna.metric.classDS.InformationContents4System;
-import zuna.metric.cohesion.C3;
 import zuna.metric.cohesion.FCM_Distance;
-import zuna.metric.cohesion.LSCC;
 import zuna.model.Element;
 import zuna.model.MyClass;
 import zuna.model.MyMethod;
 import zuna.model.MyPackage;
 import zuna.refactoring.ProjectAnalyzer;
-import zuna.refactoring.operator.Experimentor;
-import zuna.refactoring.operator.MutationClassIdentifier;
+import zuna.refactoring.operator.decomposition.MutatedLargeClass;
 
 @SuppressWarnings("restriction")
 public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
@@ -58,14 +56,14 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	            ProjectAnalyzer.firstElement = (IAdaptable)firstElement;
 	            ProjectAnalyzer.analyze(project);
 	            
+	            InformationContents4System icCalcul = new InformationContents4System();
+	            icCalcul.calculateIC();
+	            new ArchitectureBasedDS();
+	            
 	            //****************************************************************************************************
 	            
-	            Experimentor experiment = new MutationClassIdentifier();
-	            experiment.prepareExperiment();
-	            
-	            experiment.doExperiment(new FCM_Distance(ProjectAnalyzer.project));
-	            experiment.doExperiment(new LSCC(ProjectAnalyzer.project));
-	            experiment.doExperiment(new C3(ProjectAnalyzer.project));
+	            MutatedLargeClass experiment = new MutatedLargeClass(project, new HierarchicalClustering());
+	            experiment.analyze();
 	            
 			}catch(java.lang.NullPointerException e){
 				e.printStackTrace();

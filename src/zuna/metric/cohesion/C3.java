@@ -18,13 +18,14 @@ import tml.storage.Repository;
 import tml.vectorspace.TermWeighting.GlobalWeight;
 import tml.vectorspace.TermWeighting.LocalWeight;
 import tml.vectorspace.operations.PassagesSimilarity;
+import zuna.metric.LLDMetric;
 import zuna.metric.Metric;
 import zuna.model.MyClass;
 import zuna.model.MyMethod;
 import zuna.model.Repo;
 import Jama.Matrix;
 
-public class C3 extends Metric{
+public class C3 extends Metric implements LLDMetric{
 
 	protected static Repository repository;
 	protected static Properties prop;
@@ -66,12 +67,12 @@ public class C3 extends Metric{
 				repository.addMethods(c);
 				
 				Corpus corpus = new RepositoryCorpus();
-				corpus.getParameters().setTermSelectionCriterion(TermSelection.DF);
-				corpus.getParameters().setTermSelectionThreshold(0);
-				corpus.getParameters().setTermWeightLocal(LocalWeight.TF);
+//				corpus.getParameters().setTermSelectionCriterion(TermSelection.DF);
+//				corpus.getParameters().setTermSelectionThreshold(0);
+//				corpus.getParameters().setTermWeightLocal(LocalWeight.TF);
 				corpus.getParameters().setTermWeightGlobal(GlobalWeight.Idf);
 				corpus.getParameters().setDimensionalityReduction(DimensionalityReduction.NO);
-				corpus.getParameters().setNormalizeDocuments(true);
+//				corpus.getParameters().setNormalizeDocuments(true);
 				corpus.load(repository);
 				
 				distance = new PassagesSimilarity();

@@ -2,6 +2,7 @@ package zuna.metric.cohesion;
 
 import java.util.ArrayList;
 
+import zuna.metric.LLDMetric;
 import zuna.metric.Metric;
 import zuna.metric.classDS.ArchitectureBasedDS;
 import zuna.model.MyClass;
@@ -9,7 +10,7 @@ import zuna.model.MyMethod;
 import zuna.model.Repo;
 import zuna.util.KeyMaker;
 
-public class FCM_Distance extends Metric{
+public class FCM_Distance extends Metric implements LLDMetric{
 
 	public FCM_Distance(Repo p) {
 		super(p);
@@ -30,7 +31,7 @@ public class FCM_Distance extends Metric{
 				if(fanout1.size()==0 || fanout2.size()==0){
 					cohesion += 0;
 				}else{
-					double similarity = getSimilarity(fanout1, fanout2);
+					double similarity = getMetric(methods.get(i), methods.get(j));
 //					System.out.println(methods.get(i).getID() + " == " + methods.get(j).getID() + " == " + similarity);
 					cohesion += similarity;
 				}
@@ -44,9 +45,12 @@ public class FCM_Distance extends Metric{
 		}
 	}
 	
-	private double getSimilarity(ArrayList<MyMethod> fanout1, ArrayList<MyMethod> fanout2){
+	public double getMetric(MyMethod m1, MyMethod m2){
 		double similarity = 0.0;
 		double cnt = 0;
+		ArrayList<MyMethod> fanout1 = m1.getFanOut();
+		ArrayList<MyMethod> fanout2 = m2.getFanOut();
+		
 		for(MyMethod out1: fanout1){
 			for(MyMethod out2: fanout2){
 				String key = "";
@@ -74,6 +78,7 @@ public class FCM_Distance extends Metric{
 			return 0;
 		}
 	}
+	
 	
 
 }
