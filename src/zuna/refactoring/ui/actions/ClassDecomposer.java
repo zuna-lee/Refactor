@@ -58,6 +58,7 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	            IProject project = (IProject)((IAdaptable)firstElement).getAdapter(IProject.class);
 	            ProjectAnalyzer.firstElement = (IAdaptable)firstElement;
 	            ProjectAnalyzer.analyze(project);
+	            
 	            InformationContents4System icCalcul = new InformationContents4System();
 	            icCalcul.calculateIC();
 	            new ArchitectureBasedDS();
@@ -68,13 +69,14 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 //	            FCM_Distance fcm = new FCM_Distance(ProjectAnalyzer.project);
 //            	LSCC lscc = new LSCC(ProjectAnalyzer.project);
 //            	C3 c3 = new C3(ProjectAnalyzer.project);
+	            
             	CBO cbo = new CBO(ProjectAnalyzer.project);
 	            for(String key: classList.keySet()){
 	            	MyClass c = classList.get(key);
+	            	
 	            	if(!c.isLibrary()){
 	            		metric.add(c.getID() + ":" +  c.getOwnedMethods().size() + ":" + c.getOwendField().size() + ":" +
 	            				cbo.getMetric(c));
-		            	//+ ":" +  lscc.getMetric(c) + ":" + c3.getMetric(c));
 	            	}
 	            	
 	            }
