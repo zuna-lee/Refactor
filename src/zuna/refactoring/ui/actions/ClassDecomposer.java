@@ -13,6 +13,7 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.IWorkbenchWindowActionDelegate;
 import org.eclipse.ui.PlatformUI;
 
+import zuna.model.EntityAnalyzerProgress;
 import zuna.model.MyClass;
 import zuna.refactoring.ProjectAnalyzer;
 import zuna.util.Logger2File;
@@ -45,6 +46,10 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 		{
 			try {
 	            // 10 is the workload, so in your case the number of files to copy
+				
+				long start = System.currentTimeMillis();
+				int thread = Thread.activeCount();
+				
 				IStructuredSelection selection = (IStructuredSelection) window.getSelectionService().getSelection();
 				
 		        Object firstElement = selection.getFirstElement();
@@ -53,38 +58,35 @@ public class ClassDecomposer implements IWorkbenchWindowActionDelegate {
 	            ProjectAnalyzer.firstElement = (IAdaptable)firstElement;
 	            ProjectAnalyzer.analyze(project);
 	            
-	            System.out.println(ProjectAnalyzer.project.getClassList().size());
-	            System.out.println(ProjectAnalyzer.project.getMethodList().size());
-	            System.out.println(ProjectAnalyzer.project.getPackageList().size());
 	            
-	            HashMap<String, MyClass> classList = ProjectAnalyzer.project.getClassList();
-	            int cnt = 0;
-	            int tot = 0;
-	            ArrayList<String> info = new ArrayList<String>();
 	            
-	            for(String key: classList.keySet()){
-	            	MyClass c = classList.get(key);
-	            	
-	            	String id =c.getID();
-	            	String fsize = String.valueOf(c.getOwendField().size());
-	            	String msize = String.valueOf(c.getOwnedMethods().size());
-	            	String intf = String.valueOf(c.isInterface());
-	            	String abstrct = String.valueOf(c.isAbstract());
-	            	String enm = String.valueOf(c.isEnumuration());
-	            	
-	            	String v = id + ":" + fsize + ":" + msize + ":" + intf + ":" + abstrct + ":" + enm;
-	            	info.add(v);
-	            	if(!c.isInterface()){
-	            		tot++;
-	            		if(c.getOwendField().size()==0){
-	            			
-	            			cnt++;
-	            		}
-	            	}
+	            
+	            while(true){
+	            	boolean flg = false;
+		            for(Thread t : EntityAnalyzerProgress.threads){
+		            	if(t.isAlive()){
+		            		flg = true;
+		            		break;
+		            	}
+		            }
+		            
+		            if(!flg){
+		            	long end = System.currentTimeMillis();
+			            System.out.println("time : " + (end - start));
+			            System.out.println(ProjectAnalyzer.project.getClassList().size());
+			            System.out.println(ProjectAnalyzer.project.getMethodList().size());
+			            System.out.println(ProjectAnalyzer.project.getPackageList().size());
+			            break;
+		            }
 	            }
-	            Logger2File.print2CSVFile(info, "agv034");
 	            
-	            System.out.println(cnt + ":" + tot + ":" + (double) cnt / (double) tot);
+//	            while(true){
+//		            System.out.println(thread + ":" + Thread.activeCount());
+//		            if(thread==Thread.activeCount()){
+//		            	
+//			            break;
+//		            }
+//	            }
 	            
 			}catch(java.lang.NullPointerException e){
 				e.printStackTrace();

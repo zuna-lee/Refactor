@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.JavaModelException;
@@ -90,11 +91,11 @@ public class Repo  implements Serializable {
 	private static final long serialVersionUID = -5012298760929784285L;
 	private String name;
 	private static String tmpPackageName;
-	private  HashMap<String, MyPackage> packageList = new HashMap<String, MyPackage>();
-	private  HashMap<String, MyClass> classList = new HashMap<String, MyClass>();
-	private  HashMap<String, MyMethod> methodList = new HashMap<String, MyMethod>();
-	private  HashMap<String, MyField> fieldList = new HashMap<String, MyField>();
-	private  HashMap<String, MyParameter> parameterList = new HashMap<String, MyParameter>();
+	private  ConcurrentHashMap<String, MyPackage> packageList = new ConcurrentHashMap<String, MyPackage>();
+	private  ConcurrentHashMap<String, MyClass> classList = new ConcurrentHashMap<String, MyClass>();
+	private  ConcurrentHashMap<String, MyMethod> methodList = new ConcurrentHashMap<String, MyMethod>();
+	private  ConcurrentHashMap<String, MyField> fieldList = new ConcurrentHashMap<String, MyField>();
+	private  ConcurrentHashMap<String, MyParameter> parameterList = new ConcurrentHashMap<String, MyParameter>();
 	
 	public static int totPackageNumber;
 	public static int totClassNumber;
@@ -105,19 +106,19 @@ public class Repo  implements Serializable {
 		this.name = name;
 	}
 		
-	public void setPackageList(HashMap<String, MyPackage> packageList) {
+	public void setPackageList(ConcurrentHashMap<String, MyPackage> packageList) {
 		this.packageList = packageList;
 	}
 	
-	public void setMethodList(HashMap<String, MyMethod> methodList) {
+	public void setMethodList(ConcurrentHashMap<String, MyMethod> methodList) {
 		this.methodList = methodList;
 	}
 
-	public void setFieldList(HashMap<String, MyField> fieldList) {
+	public void setFieldList(ConcurrentHashMap<String, MyField> fieldList) {
 		this.fieldList = fieldList;
 	}
 
-	public HashMap<String, MyField> getFieldList() {
+	public ConcurrentHashMap<String, MyField> getFieldList() {
 		return fieldList;
 	}
 
@@ -773,7 +774,7 @@ public class Repo  implements Serializable {
 		return newMethod;
 	}
 	
-	public HashMap<String, MyPackage> getPackageList() {
+	public ConcurrentHashMap<String, MyPackage> getPackageList() {
 		return packageList;
 	}
 	
@@ -781,15 +782,15 @@ public class Repo  implements Serializable {
 		return packageList.get(key);
 	}
 	
-	public HashMap<String, MyClass> getClassList() {
+	public ConcurrentHashMap<String, MyClass> getClassList() {
 		return classList;
 	}
 	
-	public HashMap<String, MyMethod> getMethodList() {
+	public ConcurrentHashMap<String, MyMethod> getMethodList() {
 		return methodList;
 	}
 	
-	public HashMap<String, MyParameter> getParameterList() {
+	public ConcurrentHashMap<String, MyParameter> getParameterList() {
 		return parameterList;
 	}
 

@@ -11,18 +11,17 @@ import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.CompilationUnit;
-import org.eclipse.jdt.core.dom.EnumDeclaration;
 import org.eclipse.jdt.core.dom.ITypeBinding;
-import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jface.operation.IRunnableWithProgress;
 
-import zuna.parser.visitor.AbstractTypeDeclarationVisitor;
+import zuna.refactoring.EntityAnalyzer;
 import zuna.refactoring.ProjectAnalyzer;
 
 public class EntityAnalyzerProgress implements IRunnableWithProgress{
 
 	private Repo iRepo;
 	private IPackageFragment[] packages;
+	public static ArrayList<Thread> threads = new ArrayList<Thread>();
 	
 	public EntityAnalyzerProgress(Repo iRepo, IPackageFragment[] packages){
 		this.iRepo = iRepo;
@@ -36,7 +35,7 @@ public class EntityAnalyzerProgress implements IRunnableWithProgress{
 	 * @param unit
 	 * @return
 	 */
-	private static CompilationUnit parse(ICompilationUnit unit) {
+	public static CompilationUnit parse(ICompilationUnit unit) {
 		ASTParser parser = ASTParser.newParser(AST.JLS4);
 		parser.setKind(ASTParser.K_COMPILATION_UNIT);
 		parser.setSource(unit);
@@ -82,53 +81,17 @@ public class EntityAnalyzerProgress implements IRunnableWithProgress{
 		for (IPackageFragment mypackage : packages) {
 			if (mypackage.getKind() == IPackageFragmentRoot.K_SOURCE){
 				monitor.subTask(mypackage.getElementName() + "package is being analyzed");
+				Thread t = new Thread(new EntityAnalyzer(iRepo, mypackage));
+				t.start();
+				threads.add(t);
 				
-				for (ICompilationUnit unit : mypackage.getCompilationUnits()) {
-					// Now create the AST for the ICompilationUnits
-					CompilationUnit parser = parse(unit);
-					
-					AbstractTypeDeclarationVisitor typeVisitor = new AbstractTypeDeclarationVisitor();
-					
-					parser.accept(typeVisitor);
-					
-					ArrayList<TypeDeclaration> classType = typeVisitor.getTypes();
-					
-					MyPackage pack = iRepo.getPackage(mypackage.getElementName());
-	
-					for (TypeDeclaration typeDeclaration : classType) {
-						
-						try {
-							
-							iRepo.makeClassNode(pack, typeDeclaration, parser, mypackage);
-						}
-						catch (Exception e) {
-							
-							System.out.println("packages [" + mypackage.getElementName() + "." + mypackage.getKind() + "]");
-							System.out.println("Class [" + unit.getElementName() + "]");
-							
-							e.printStackTrace();
-						}
-					}
-					
-					for (EnumDeclaration enumDeclaration : typeVisitor.getEnums()) {
-						
-						try {
-							
-							iRepo.makeEnumNode(iRepo, pack, enumDeclaration, mypackage);
-						}
-						catch (Exception e) {
-							
-							System.out.println("packages [" + mypackage.getElementName() + "." + mypackage.getKind() + "]");
-							System.out.println("Enum [" + unit.getElementName() + "]");
-							
-							e.printStackTrace();
-						}
-					}
-				}
 				monitor.worked(++prog);
 			}
 		}
+		
+		
 	}
+
 
 
 	private void makeFanout(IProgressMonitor monitor, int prog) {
@@ -257,6 +220,8 @@ public class EntityAnalyzerProgress implements IRunnableWithProgress{
 			}
 		}
 	}
+	
+	
 	
 }
 
