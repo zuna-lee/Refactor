@@ -15,9 +15,6 @@ import org.eclipse.ui.PlatformUI;
 
 import zuna.metric.classDS.ArchitectureBasedDS;
 import zuna.metric.classDS.InformationContents4System;
-import zuna.metric.cohesion.C3;
-import zuna.metric.cohesion.FCM_Distance;
-import zuna.metric.cohesion.LSCC;
 import zuna.metric.coupling.CBO;
 import zuna.model.MyClass;
 import zuna.refactoring.ProjectAnalyzer;
